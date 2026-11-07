@@ -27,6 +27,12 @@ const ICONS = {
   "/expenses": (
     <path d="M5 7.5h14v10.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7.5Zm0 3.5h14M8 5.5h8" />
   ),
+  "/reports": (
+    <path d="M3 3v18h18M7 16l4-4 4 4 4-4" />
+  ),
+  "/inventory-alerts": (
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4M12 17h.01" />
+  ),
 };
 
 function NavIcon({ href }) {
