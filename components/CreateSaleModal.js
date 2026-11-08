@@ -355,7 +355,7 @@ export default function CreateSaleModal({ open, onClose, onSuccess }) {
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Walk-in Customer name"
                 disabled={submitting}
-                className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/30 ${
+                className={`mt-1.5 w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/30 ${
                   errors.customerName ? "border-red-400 bg-red-50/30" : "border-vendora/20"
                 }`}
               />
@@ -375,7 +375,7 @@ export default function CreateSaleModal({ open, onClose, onSuccess }) {
                   }
                 }}
                 disabled={loadingData || submitting}
-                className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/30 ${
+                className={`mt-1.5 w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/30 ${
                   errors.customer ? "border-red-400 bg-red-50/30" : "border-vendora/20"
                 }`}
               >
@@ -409,7 +409,7 @@ export default function CreateSaleModal({ open, onClose, onSuccess }) {
               value={saleDate}
               onChange={(e) => setSaleDate(e.target.value)}
               disabled={submitting}
-              className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/30 ${
+              className={`mt-1.5 w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/30 ${
                 errors.saleDate ? "border-red-400 bg-red-50/30" : "border-vendora/20"
               }`}
             />
@@ -434,7 +434,7 @@ export default function CreateSaleModal({ open, onClose, onSuccess }) {
               type="button"
               onClick={handleAddItem}
               disabled={submitting || products.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-vendora/20 bg-white px-3 py-1.5 text-xs font-medium text-vendora transition hover:bg-vendora-bg"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-vendora/20 bg-surface px-3 py-1.5 text-xs font-medium text-vendora transition hover:bg-vendora-bg"
             >
               <PlusIcon className="h-3.5 w-3.5" />
               <span>Add Item</span>
@@ -451,7 +451,7 @@ export default function CreateSaleModal({ open, onClose, onSuccess }) {
               return (
                 <div
                   key={index}
-                  className="rounded-xl border border-vendora/10 bg-white p-3.5 shadow-2xs"
+                  className="rounded-xl border border-vendora/10 bg-surface p-3.5 shadow-2xs"
                 >
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-center">
                     {/* Product Selection */}
@@ -480,7 +480,7 @@ export default function CreateSaleModal({ open, onClose, onSuccess }) {
                           handleProductChange(index, e.target.value)
                         }
                         disabled={submitting}
-                        className={`mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-1 focus:ring-vendora ${
+                        className={`mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-1 focus:ring-vendora ${
                           errors[`item_${index}_product`]
                             ? "border-red-400 bg-red-50/30"
                             : "border-vendora/20"

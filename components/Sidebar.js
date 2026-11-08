@@ -69,7 +69,10 @@ export default function Sidebar({ open, pathname, onNavigate }) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4" aria-label="Main">
+      <nav className="flex-1 space-y-0.5 px-3 py-4" aria-label="Main">
+        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">
+          Workspace
+        </p>
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
 
@@ -79,18 +82,28 @@ export default function Sidebar({ open, pathname, onNavigate }) {
               href={item.href}
               onClick={onNavigate}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
                 active
-                  ? "bg-white/10 font-medium text-white"
-                  : "text-white/75 hover:bg-white/10 hover:text-white"
+                  ? "bg-white/10 font-semibold text-white"
+                  : "text-white/70 hover:bg-white/5 hover:text-white"
               }`}
             >
+              <span
+                className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-vendora-accent transition-opacity ${
+                  active ? "opacity-100" : "opacity-0"
+                }`}
+                aria-hidden="true"
+              />
               <NavIcon href={item.href} />
               {item.label}
             </Link>
           );
         })}
       </nav>
+
+      <div className="border-t border-white/10 px-5 py-4">
+        <p className="text-[11px] text-white/40">VENDORA ERP · v1.0</p>
+      </div>
     </aside>
   );
 }

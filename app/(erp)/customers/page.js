@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import { getCustomers, deleteCustomer } from "../../../lib/api";
-import CustomerFormModal from "../../../components/CustomerFormModal";
+import { useResource, invalidate } from "../../../lib/useResource";
 import ConfirmModal from "../../../components/ConfirmModal";
 import Toast from "../../../components/Toast";
+import { SkeletonTable } from "../../../components/Skeleton";
 import {
   SearchIcon,
   PlusIcon,
@@ -19,11 +21,14 @@ import {
   CloseIcon,
 } from "../../../components/Icons";
 
+const CustomerFormModal = dynamic(
+  () => import("../../../components/CustomerFormModal"),
+  { ssr: false }
+);
+
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
 
   // Modals state
   const [formModalOpen, setFormModalOpen] = useState(false);
@@ -35,44 +40,37 @@ export default function CustomersPage() {
   // Toast feedback state
   const [toast, setToast] = useState({ message: "", type: "success" });
 
-  const loadCustomers = useCallback(
-    async (search = searchQuery) => {
-      setLoading(true);
-      setError("");
+  const cacheKey = `customers:${appliedSearch}`;
+  const {
+    data: customers = [],
+    loading,
+    error,
+    refresh,
+    refreshing,
+  } = useResource(cacheKey, async () => {
+    const data = await getCustomers({ search: appliedSearch });
+    return data?.customers || [];
+  });
+  const errorMsg = error ? error.message || "Failed to load customers" : "";
 
-      try {
-        const data = await getCustomers({ search });
-        if (data?.success) {
-          setCustomers(data.customers || []);
-        } else {
-          setError(data?.message || "Failed to load customers");
-        }
-      } catch (err) {
-        setError(err.message || "Failed to connect to the server.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [searchQuery]
-  );
-
-  useEffect(() => {
-    loadCustomers();
-  }, [loadCustomers]);
+  function reloadAfterMutation() {
+    invalidate("customers:");
+    invalidate("dashboard");
+    refresh();
+  }
 
   function handleSearchChange(e) {
-    const val = e.target.value;
-    setSearchQuery(val);
+    setSearchQuery(e.target.value);
   }
 
   function handleSearchSubmit(e) {
     e.preventDefault();
-    loadCustomers(searchQuery);
+    setAppliedSearch(searchQuery);
   }
 
   function handleClearSearch() {
     setSearchQuery("");
-    loadCustomers("");
+    setAppliedSearch("");
   }
 
   function handleOpenAdd() {
@@ -104,7 +102,7 @@ export default function CustomersPage() {
       });
       setDeleteModalOpen(false);
       setCustomerToDelete(null);
-      loadCustomers();
+      reloadAfterMutation();
     } catch (err) {
       setToast({
         type: "error",
@@ -122,7 +120,7 @@ export default function CustomersPage() {
         ? `Customer "${savedCustomer.name}" updated successfully.`
         : `Customer "${savedCustomer.name}" registered successfully.`,
     });
-    loadCustomers();
+    reloadAfterMutation();
   }
 
   return (
@@ -147,12 +145,12 @@ export default function CustomersPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => loadCustomers()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
+            onClick={refresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
             title="Refresh list"
           >
-            <RefreshIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
@@ -168,7 +166,7 @@ export default function CustomersPage() {
       </div>
 
       {/* Search Bar */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <form onSubmit={handleSearchSubmit} className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-vendora-text/40">
             <SearchIcon className="h-4 w-4" />
@@ -178,7 +176,7 @@ export default function CustomersPage() {
             value={searchQuery}
             onChange={handleSearchChange}
             placeholder="Search customers by name, phone or email..."
-            className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-white focus:ring-2 focus:ring-vendora-accent/20"
+            className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-surface focus:ring-2 focus:ring-vendora-accent/20"
           />
           {searchQuery ? (
             <button
@@ -204,38 +202,31 @@ export default function CustomersPage() {
       </div>
 
       {/* Main Content Area */}
-      {error ? (
+      {errorMsg ? (
         <div
           role="alert"
-          className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center"
+          className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center dark:bg-red-500/5"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
             <AlertTriangleIcon className="h-6 w-6" />
           </div>
-          <h3 className="mt-3 text-base font-semibold text-red-800">
+          <h3 className="mt-3 text-base font-semibold text-red-800 dark:text-red-300">
             Failed to Load Customers
           </h3>
-          <p className="mt-1 max-w-md text-sm text-red-600">{error}</p>
+          <p className="mt-1 max-w-md text-sm text-red-600">{errorMsg}</p>
           <button
             type="button"
-            onClick={() => loadCustomers()}
+            onClick={refresh}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
           >
             <RefreshIcon className="h-4 w-4" />
             Retry
           </button>
         </div>
-      ) : loading && customers.length === 0 ? (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
-          <div className="p-8 text-center">
-            <div className="inline-flex h-12 w-12 animate-spin items-center justify-center rounded-full border-4 border-vendora/20 border-t-vendora"></div>
-            <p className="mt-4 text-sm font-medium text-vendora-text/80">
-              Loading customer profiles...
-            </p>
-          </div>
-        </div>
+      ) : loading ? (
+        <SkeletonTable rows={6} cols={6} />
       ) : customers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-white p-12 text-center shadow-xs">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-surface p-12 text-center shadow-xs">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-vendora-bg text-vendora">
             <BuildingIcon className="h-7 w-7" />
           </div>
@@ -268,7 +259,7 @@ export default function CustomersPage() {
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
+        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-surface shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -398,13 +389,15 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {/* Customer Form Modal */}
-      <CustomerFormModal
-        open={formModalOpen}
-        onClose={() => setFormModalOpen(false)}
-        customer={editingCustomer}
-        onSuccess={handleFormSuccess}
-      />
+      {/* Customer Form Modal (lazy: chunk loads on first open) */}
+      {formModalOpen && (
+        <CustomerFormModal
+          open={formModalOpen}
+          onClose={() => setFormModalOpen(false)}
+          customer={editingCustomer}
+          onSuccess={handleFormSuccess}
+        />
+      )}
 
       {/* Confirm Delete / Deactivate Modal */}
       <ConfirmModal

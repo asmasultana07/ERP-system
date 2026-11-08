@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
+import ThemeToggle from "./ThemeToggle";
+
 function initials(name) {
   if (!name || typeof name !== "string") {
     return "";
@@ -51,7 +53,7 @@ export default function TopBar({ title, user, menuOpen, onMenu, onLogout }) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-vendora/10 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-vendora/10 bg-surface/95 px-4 py-3 backdrop-blur sm:px-6">
       <button
         type="button"
         className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-vendora/15 text-vendora md:hidden"
@@ -71,6 +73,8 @@ export default function TopBar({ title, user, menuOpen, onMenu, onLogout }) {
       <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-vendora-text sm:text-xl">
         {title}
       </h1>
+
+      <ThemeToggle />
 
       <div className="relative" ref={menuRef}>
         <button
@@ -92,7 +96,7 @@ export default function TopBar({ title, user, menuOpen, onMenu, onLogout }) {
         {profileOpen ? (
           <div
             role="menu"
-            className="absolute right-0 z-30 mt-2 w-60 rounded-2xl border border-vendora/10 bg-white p-3 shadow-lg"
+            className="absolute right-0 z-30 mt-2 w-60 rounded-2xl border border-vendora/10 bg-surface p-3 shadow-lg"
           >
             <div className="flex items-center gap-3 px-1">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-vendora-bg text-sm font-semibold text-vendora">

@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import {
   getPurchases,
   getSuppliers,
   cancelPurchase,
 } from "../../../lib/api";
-import CreatePurchaseModal from "../../../components/CreatePurchaseModal";
-import PurchaseDetailsModal from "../../../components/PurchaseDetailsModal";
+import { useResource, invalidate } from "../../../lib/useResource";
 import ConfirmModal from "../../../components/ConfirmModal";
 import Toast from "../../../components/Toast";
+import { SkeletonTable } from "../../../components/Skeleton";
+
+const CreatePurchaseModal = dynamic(() => import("../../../components/CreatePurchaseModal"), { ssr: false });
+const PurchaseDetailsModal = dynamic(() => import("../../../components/PurchaseDetailsModal"), { ssr: false });
 import {
   SearchIcon,
   PlusIcon,
@@ -22,13 +26,9 @@ import {
 } from "../../../components/Icons";
 
 export default function PurchasesPage() {
-  const [purchases, setPurchases] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -37,8 +37,6 @@ export default function PurchasesPage() {
 
   // Pagination state
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
 
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -52,91 +50,54 @@ export default function PurchasesPage() {
   // Toast feedback state
   const [toast, setToast] = useState({ message: "", type: "success" });
 
-  // Fetch active suppliers for filter dropdown
-  useEffect(() => {
-    async function loadSuppliersList() {
-      try {
-        const res = await getSuppliers();
-        if (res?.success) {
-          setSuppliers(res.suppliers || []);
-        }
-      } catch {
-        // Silently handle dropdown filter helper fetch
-      }
-    }
-    loadSuppliersList();
-  }, []);
+  // Suppliers for the filter dropdown (shares cache with the Suppliers module).
+  const suppliersRes = useResource("suppliers:", async () => {
+    const res = await getSuppliers();
+    return res?.suppliers || [];
+  });
+  const suppliers = suppliersRes.data || [];
 
-  const loadPurchases = useCallback(
-    async (
-      currentPage = page,
-      search = searchQuery,
-      supplier = supplierFilter,
-      payment = paymentStatusFilter,
-      status = statusFilter,
-      start = startDate,
-      end = endDate
-    ) => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const res = await getPurchases({
-          page: currentPage,
-          limit: 10,
-          search,
-          supplier,
-          paymentStatus: payment,
-          status,
-          startDate: start,
-          endDate: end,
-        });
-
-        if (res?.success) {
-          setPurchases(res.purchases || []);
-          setTotalPages(res.totalPages || 1);
-          setTotalCount(res.total || 0);
-          setPage(res.currentPage || 1);
-        } else {
-          setError(res?.message || "Failed to load purchases");
-        }
-      } catch (err) {
-        setError(err.message || "Failed to connect to the server.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [
+  // Cached list keyed by page + all applied filters → instant paging/revisits.
+  const cacheKey = `purchases:${page}|${appliedSearch}|${supplierFilter}|${paymentStatusFilter}|${statusFilter}|${startDate}|${endDate}`;
+  const { data, loading, error, refresh, refreshing } = useResource(cacheKey, () =>
+    getPurchases({
       page,
-      searchQuery,
-      supplierFilter,
-      paymentStatusFilter,
-      statusFilter,
+      limit: 10,
+      search: appliedSearch,
+      supplier: supplierFilter,
+      paymentStatus: paymentStatusFilter,
+      status: statusFilter,
       startDate,
       endDate,
-    ]
+    })
   );
+  const purchases = data?.purchases || [];
+  const totalPages = data?.totalPages || 1;
+  const totalCount = data?.total || 0;
+  const errMsg = error ? error.message || "Failed to load purchases" : "";
 
-  useEffect(() => {
-    loadPurchases();
-  }, [loadPurchases]);
+  function reloadAfterMutation() {
+    invalidate("purchases:");
+    invalidate("dashboard");
+    refresh();
+  }
 
   // Handle Search & Filter Changes
   function handleSearchSubmit(e) {
     e.preventDefault();
+    setAppliedSearch(searchQuery);
     setPage(1);
-    loadPurchases(1, searchQuery, supplierFilter, paymentStatusFilter, statusFilter, startDate, endDate);
   }
 
   function handleResetFilters() {
     setSearchQuery("");
+    setAppliedSearch("");
     setSupplierFilter("all");
     setPaymentStatusFilter("all");
     setStatusFilter("all");
     setStartDate("");
     setEndDate("");
     setPage(1);
-    loadPurchases(1, "", "all", "all", "all", "", "");
   }
 
   // Handle Purchase View Details
@@ -164,7 +125,7 @@ export default function PurchasesPage() {
         });
         setCancelModalOpen(false);
         setPurchaseToCancel(null);
-        loadPurchases();
+        reloadAfterMutation();
       } else {
         setToast({
           type: "error",
@@ -187,7 +148,7 @@ export default function PurchasesPage() {
       message: `Purchase "${newPurchase.purchaseNumber}" recorded successfully.`,
     });
     setPage(1);
-    loadPurchases(1);
+    reloadAfterMutation();
   }
 
   const hasActiveFilters =
@@ -221,12 +182,12 @@ export default function PurchasesPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => loadPurchases()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
+            onClick={refresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
             title="Refresh list"
           >
-            <RefreshIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
@@ -242,7 +203,7 @@ export default function PurchasesPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="space-y-3 rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs">
+      <div className="space-y-3 rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Search by Purchase Number */}
           <form onSubmit={handleSearchSubmit} className="relative flex-1">
@@ -254,15 +215,15 @@ export default function PurchasesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by purchase number (e.g. PUR-20261107-0001)..."
-              className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-white focus:ring-2 focus:ring-vendora-accent/20"
+              className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-surface focus:ring-2 focus:ring-vendora-accent/20"
             />
             {searchQuery ? (
               <button
                 type="button"
                 onClick={() => {
                   setSearchQuery("");
+                  setAppliedSearch("");
                   setPage(1);
-                  loadPurchases(1, "", supplierFilter, paymentStatusFilter, statusFilter, startDate, endDate);
                 }}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-vendora-text/40 hover:text-vendora-text"
                 aria-label="Clear search"
@@ -287,9 +248,8 @@ export default function PurchasesPage() {
                 const val = e.target.value;
                 setSupplierFilter(val);
                 setPage(1);
-                loadPurchases(1, searchQuery, val, paymentStatusFilter, statusFilter, startDate, endDate);
               }}
-              className="rounded-xl border border-vendora/15 bg-white px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/20"
+              className="rounded-xl border border-vendora/15 bg-surface px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/20"
             >
               <option value="all">All Suppliers</option>
               {suppliers.map((s) => (
@@ -314,9 +274,8 @@ export default function PurchasesPage() {
                 const val = e.target.value;
                 setPaymentStatusFilter(val);
                 setPage(1);
-                loadPurchases(1, searchQuery, supplierFilter, val, statusFilter, startDate, endDate);
               }}
-              className="rounded-lg border border-vendora/15 bg-white px-2.5 py-1.5 text-xs text-vendora-text outline-none"
+              className="rounded-lg border border-vendora/15 bg-surface px-2.5 py-1.5 text-xs text-vendora-text outline-none"
             >
               <option value="all">All</option>
               <option value="Paid">Paid</option>
@@ -336,9 +295,8 @@ export default function PurchasesPage() {
                 const val = e.target.value;
                 setStatusFilter(val);
                 setPage(1);
-                loadPurchases(1, searchQuery, supplierFilter, paymentStatusFilter, val, startDate, endDate);
               }}
-              className="rounded-lg border border-vendora/15 bg-white px-2.5 py-1.5 text-xs text-vendora-text outline-none"
+              className="rounded-lg border border-vendora/15 bg-surface px-2.5 py-1.5 text-xs text-vendora-text outline-none"
             >
               <option value="all">All</option>
               <option value="Completed">Completed</option>
@@ -358,9 +316,8 @@ export default function PurchasesPage() {
                 const val = e.target.value;
                 setStartDate(val);
                 setPage(1);
-                loadPurchases(1, searchQuery, supplierFilter, paymentStatusFilter, statusFilter, val, endDate);
               }}
-              className="rounded-lg border border-vendora/15 bg-white px-2 py-1 text-xs text-vendora-text outline-none"
+              className="rounded-lg border border-vendora/15 bg-surface px-2 py-1 text-xs text-vendora-text outline-none"
             />
           </div>
 
@@ -375,9 +332,8 @@ export default function PurchasesPage() {
                 const val = e.target.value;
                 setEndDate(val);
                 setPage(1);
-                loadPurchases(1, searchQuery, supplierFilter, paymentStatusFilter, statusFilter, startDate, val);
               }}
-              className="rounded-lg border border-vendora/15 bg-white px-2 py-1 text-xs text-vendora-text outline-none"
+              className="rounded-lg border border-vendora/15 bg-surface px-2 py-1 text-xs text-vendora-text outline-none"
             />
           </div>
 
@@ -394,38 +350,31 @@ export default function PurchasesPage() {
       </div>
 
       {/* Purchases Content Table */}
-      {error ? (
+      {errMsg ? (
         <div
           role="alert"
-          className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center"
+          className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center dark:bg-red-500/5"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
             <AlertTriangleIcon className="h-6 w-6" />
           </div>
-          <h3 className="mt-3 text-base font-semibold text-red-800">
+          <h3 className="mt-3 text-base font-semibold text-red-800 dark:text-red-300">
             Failed to Load Purchases
           </h3>
-          <p className="mt-1 max-w-md text-sm text-red-600">{error}</p>
+          <p className="mt-1 max-w-md text-sm text-red-600">{errMsg}</p>
           <button
             type="button"
-            onClick={() => loadPurchases()}
+            onClick={refresh}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
           >
             <RefreshIcon className="h-4 w-4" />
             Retry
           </button>
         </div>
-      ) : loading && purchases.length === 0 ? (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
-          <div className="p-8 text-center">
-            <div className="inline-flex h-12 w-12 animate-spin items-center justify-center rounded-full border-4 border-vendora/20 border-t-vendora"></div>
-            <p className="mt-4 text-sm font-medium text-vendora-text/80">
-              Loading purchase records...
-            </p>
-          </div>
-        </div>
+      ) : loading ? (
+        <SkeletonTable rows={8} cols={7} />
       ) : purchases.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-white p-12 text-center shadow-xs">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-surface p-12 text-center shadow-xs">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-vendora-bg text-vendora">
             <ReceiptIcon className="h-7 w-7" />
           </div>
@@ -458,7 +407,7 @@ export default function PurchasesPage() {
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
+        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-surface shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -627,13 +576,9 @@ export default function PurchasesPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    const prev = Math.max(1, page - 1);
-                    setPage(prev);
-                    loadPurchases(prev);
-                  }}
+                  onClick={() => setPage(Math.max(1, page - 1))}
                   disabled={page <= 1 || loading}
-                  className="rounded-lg border border-vendora/20 bg-white px-3 py-1.5 font-medium transition hover:bg-vendora-bg disabled:opacity-40"
+                  className="rounded-lg border border-vendora/20 bg-surface px-3 py-1.5 font-medium transition hover:bg-vendora-bg disabled:opacity-40"
                 >
                   Previous
                 </button>
@@ -642,13 +587,9 @@ export default function PurchasesPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = Math.min(totalPages, page + 1);
-                    setPage(next);
-                    loadPurchases(next);
-                  }}
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
                   disabled={page >= totalPages || loading}
-                  className="rounded-lg border border-vendora/20 bg-white px-3 py-1.5 font-medium transition hover:bg-vendora-bg disabled:opacity-40"
+                  className="rounded-lg border border-vendora/20 bg-surface px-3 py-1.5 font-medium transition hover:bg-vendora-bg disabled:opacity-40"
                 >
                   Next
                 </button>
@@ -658,20 +599,24 @@ export default function PurchasesPage() {
         </div>
       )}
 
-      {/* Record Purchase Modal */}
-      <CreatePurchaseModal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onSuccess={handlePurchaseCreated}
-      />
+      {/* Record Purchase Modal (lazy) */}
+      {createModalOpen && (
+        <CreatePurchaseModal
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onSuccess={handlePurchaseCreated}
+        />
+      )}
 
-      {/* Purchase Details Modal */}
-      <PurchaseDetailsModal
-        open={detailsModalOpen}
-        onClose={() => setDetailsModalOpen(false)}
-        purchase={selectedPurchase}
-        onCancelRequest={(p) => handleRequestCancel(p)}
-      />
+      {/* Purchase Details Modal (lazy) */}
+      {detailsModalOpen && (
+        <PurchaseDetailsModal
+          open={detailsModalOpen}
+          onClose={() => setDetailsModalOpen(false)}
+          purchase={selectedPurchase}
+          onCancelRequest={(p) => handleRequestCancel(p)}
+        />
+      )}
 
       {/* Confirm Cancellation Modal */}
       <ConfirmModal

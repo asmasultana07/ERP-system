@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import { getSales, getCustomers, cancelSale } from "../../../lib/api";
-import CreateSaleModal from "../../../components/CreateSaleModal";
-import SaleDetailsModal from "../../../components/SaleDetailsModal";
+import { useResource, invalidate } from "../../../lib/useResource";
 import ConfirmModal from "../../../components/ConfirmModal";
 import Toast from "../../../components/Toast";
+import { SkeletonTable } from "../../../components/Skeleton";
+
+const CreateSaleModal = dynamic(() => import("../../../components/CreateSaleModal"), { ssr: false });
+const SaleDetailsModal = dynamic(() => import("../../../components/SaleDetailsModal"), { ssr: false });
 import {
   SearchIcon,
   PlusIcon,
@@ -18,13 +22,9 @@ import {
 } from "../../../components/Icons";
 
 export default function SalesPage() {
-  const [sales, setSales] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -33,8 +33,6 @@ export default function SalesPage() {
 
   // Pagination state
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
 
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -48,89 +46,53 @@ export default function SalesPage() {
   // Toast feedback state
   const [toast, setToast] = useState({ message: "", type: "success" });
 
-  useEffect(() => {
-    async function loadCustomersList() {
-      try {
-        const res = await getCustomers();
-        if (res?.success) {
-          setCustomers(res.customers || []);
-        }
-      } catch {
-        // Silently catch dropdown filter helper fetch
-      }
-    }
-    loadCustomersList();
-  }, []);
+  // Customers for the filter dropdown (shares cache with the Customers module).
+  const customersRes = useResource("customers:", async () => {
+    const res = await getCustomers();
+    return res?.customers || [];
+  });
+  const customers = customersRes.data || [];
 
-  const loadSales = useCallback(
-    async (
-      currentPage = page,
-      search = searchQuery,
-      customer = customerFilter,
-      payment = paymentStatusFilter,
-      status = statusFilter,
-      start = startDate,
-      end = endDate
-    ) => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const res = await getSales({
-          page: currentPage,
-          limit: 10,
-          search,
-          customer,
-          paymentStatus: payment,
-          status,
-          startDate: start,
-          endDate: end,
-        });
-
-        if (res?.success) {
-          setSales(res.sales || []);
-          setTotalPages(res.totalPages || 1);
-          setTotalCount(res.total || 0);
-          setPage(res.currentPage || 1);
-        } else {
-          setError(res?.message || "Failed to load sales");
-        }
-      } catch (err) {
-        setError(err.message || "Failed to connect to the server.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [
+  // Cached list keyed by page + all applied filters → instant paging/revisits.
+  const cacheKey = `sales:${page}|${appliedSearch}|${customerFilter}|${paymentStatusFilter}|${statusFilter}|${startDate}|${endDate}`;
+  const { data, loading, error, refresh, refreshing } = useResource(cacheKey, () =>
+    getSales({
       page,
-      searchQuery,
-      customerFilter,
-      paymentStatusFilter,
-      statusFilter,
+      limit: 10,
+      search: appliedSearch,
+      customer: customerFilter,
+      paymentStatus: paymentStatusFilter,
+      status: statusFilter,
       startDate,
       endDate,
-    ]
+    })
   );
+  const sales = data?.sales || [];
+  const totalPages = data?.totalPages || 1;
+  const totalCount = data?.total || 0;
+  const errMsg = error ? error.message || "Failed to load sales" : "";
 
-  useEffect(() => {
-    loadSales();
-  }, [loadSales]);
+  function reloadAfterMutation() {
+    invalidate("sales:");
+    invalidate("dashboard");
+    refresh();
+  }
 
   function handleSearchSubmit(e) {
     e.preventDefault();
+    setAppliedSearch(searchQuery);
     setPage(1);
-    loadSales(1, searchQuery, customerFilter, paymentStatusFilter, statusFilter, startDate, endDate);
   }
 
   function handleResetFilters() {
     setSearchQuery("");
+    setAppliedSearch("");
     setCustomerFilter("all");
     setPaymentStatusFilter("all");
     setStatusFilter("all");
     setStartDate("");
     setEndDate("");
     setPage(1);
-    loadSales(1, "", "all", "all", "all", "", "");
   }
 
   function handleViewDetails(sale) {
@@ -156,7 +118,7 @@ export default function SalesPage() {
         });
         setCancelModalOpen(false);
         setSaleToCancel(null);
-        loadSales();
+        reloadAfterMutation();
       } else {
         setToast({
           type: "error",
@@ -179,7 +141,7 @@ export default function SalesPage() {
       message: `Invoice "${newSale.invoiceNumber}" generated and inventory updated.`,
     });
     setPage(1);
-    loadSales(1);
+    reloadAfterMutation();
   }
 
   const hasActiveFilters =
@@ -212,12 +174,12 @@ export default function SalesPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => loadSales()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
+            onClick={refresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
             title="Refresh list"
           >
-            <RefreshIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
@@ -233,7 +195,7 @@ export default function SalesPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="space-y-3 rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs">
+      <div className="space-y-3 rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Search by Invoice # or Customer */}
           <form onSubmit={handleSearchSubmit} className="relative flex-1">
@@ -245,15 +207,15 @@ export default function SalesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by invoice number (INV-...) or customer name..."
-              className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-white focus:ring-2 focus:ring-vendora-accent/20"
+              className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-surface focus:ring-2 focus:ring-vendora-accent/20"
             />
             {searchQuery ? (
               <button
                 type="button"
                 onClick={() => {
                   setSearchQuery("");
+                  setAppliedSearch("");
                   setPage(1);
-                  loadSales(1, "", customerFilter, paymentStatusFilter, statusFilter, startDate, endDate);
                 }}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-vendora-text/40 hover:text-vendora-text"
                 aria-label="Clear search"
@@ -278,9 +240,8 @@ export default function SalesPage() {
                 const val = e.target.value;
                 setCustomerFilter(val);
                 setPage(1);
-                loadSales(1, searchQuery, val, paymentStatusFilter, statusFilter, startDate, endDate);
               }}
-              className="rounded-xl border border-vendora/15 bg-white px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/20"
+              className="rounded-xl border border-vendora/15 bg-surface px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/20"
             >
               <option value="all">All Customers</option>
               <option value="walk-in">Walk-in Customers Only</option>
@@ -306,9 +267,8 @@ export default function SalesPage() {
                 const val = e.target.value;
                 setPaymentStatusFilter(val);
                 setPage(1);
-                loadSales(1, searchQuery, customerFilter, val, statusFilter, startDate, endDate);
               }}
-              className="rounded-lg border border-vendora/15 bg-white px-2.5 py-1.5 text-xs text-vendora-text outline-none"
+              className="rounded-lg border border-vendora/15 bg-surface px-2.5 py-1.5 text-xs text-vendora-text outline-none"
             >
               <option value="all">All</option>
               <option value="Paid">Paid</option>
@@ -328,9 +288,8 @@ export default function SalesPage() {
                 const val = e.target.value;
                 setStatusFilter(val);
                 setPage(1);
-                loadSales(1, searchQuery, customerFilter, paymentStatusFilter, val, startDate, endDate);
               }}
-              className="rounded-lg border border-vendora/15 bg-white px-2.5 py-1.5 text-xs text-vendora-text outline-none"
+              className="rounded-lg border border-vendora/15 bg-surface px-2.5 py-1.5 text-xs text-vendora-text outline-none"
             >
               <option value="all">All</option>
               <option value="Completed">Completed</option>
@@ -350,9 +309,8 @@ export default function SalesPage() {
                 const val = e.target.value;
                 setStartDate(val);
                 setPage(1);
-                loadSales(1, searchQuery, customerFilter, paymentStatusFilter, statusFilter, val, endDate);
               }}
-              className="rounded-lg border border-vendora/15 bg-white px-2 py-1 text-xs text-vendora-text outline-none"
+              className="rounded-lg border border-vendora/15 bg-surface px-2 py-1 text-xs text-vendora-text outline-none"
             />
           </div>
 
@@ -367,9 +325,8 @@ export default function SalesPage() {
                 const val = e.target.value;
                 setEndDate(val);
                 setPage(1);
-                loadSales(1, searchQuery, customerFilter, paymentStatusFilter, statusFilter, startDate, val);
               }}
-              className="rounded-lg border border-vendora/15 bg-white px-2 py-1 text-xs text-vendora-text outline-none"
+              className="rounded-lg border border-vendora/15 bg-surface px-2 py-1 text-xs text-vendora-text outline-none"
             />
           </div>
 
@@ -386,38 +343,31 @@ export default function SalesPage() {
       </div>
 
       {/* Main Table */}
-      {error ? (
+      {errMsg ? (
         <div
           role="alert"
-          className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center"
+          className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center dark:bg-red-500/5"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
             <AlertTriangleIcon className="h-6 w-6" />
           </div>
-          <h3 className="mt-3 text-base font-semibold text-red-800">
+          <h3 className="mt-3 text-base font-semibold text-red-800 dark:text-red-300">
             Failed to Load Sales
           </h3>
-          <p className="mt-1 max-w-md text-sm text-red-600">{error}</p>
+          <p className="mt-1 max-w-md text-sm text-red-600">{errMsg}</p>
           <button
             type="button"
-            onClick={() => loadSales()}
+            onClick={refresh}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
           >
             <RefreshIcon className="h-4 w-4" />
             Retry
           </button>
         </div>
-      ) : loading && sales.length === 0 ? (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
-          <div className="p-8 text-center">
-            <div className="inline-flex h-12 w-12 animate-spin items-center justify-center rounded-full border-4 border-vendora/20 border-t-vendora"></div>
-            <p className="mt-4 text-sm font-medium text-vendora-text/80">
-              Loading sales transactions...
-            </p>
-          </div>
-        </div>
+      ) : loading ? (
+        <SkeletonTable rows={8} cols={7} />
       ) : sales.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-white p-12 text-center shadow-xs">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-surface p-12 text-center shadow-xs">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-vendora-bg text-vendora">
             <ReceiptIcon className="h-7 w-7" />
           </div>
@@ -450,7 +400,7 @@ export default function SalesPage() {
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
+        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-surface shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -617,13 +567,9 @@ export default function SalesPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    const prev = Math.max(1, page - 1);
-                    setPage(prev);
-                    loadSales(prev);
-                  }}
+                  onClick={() => setPage(Math.max(1, page - 1))}
                   disabled={page <= 1 || loading}
-                  className="rounded-lg border border-vendora/20 bg-white px-3 py-1.5 font-medium transition hover:bg-vendora-bg disabled:opacity-40"
+                  className="rounded-lg border border-vendora/20 bg-surface px-3 py-1.5 font-medium transition hover:bg-vendora-bg disabled:opacity-40"
                 >
                   Previous
                 </button>
@@ -632,13 +578,9 @@ export default function SalesPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = Math.min(totalPages, page + 1);
-                    setPage(next);
-                    loadSales(next);
-                  }}
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
                   disabled={page >= totalPages || loading}
-                  className="rounded-lg border border-vendora/20 bg-white px-3 py-1.5 font-medium transition hover:bg-vendora-bg disabled:opacity-40"
+                  className="rounded-lg border border-vendora/20 bg-surface px-3 py-1.5 font-medium transition hover:bg-vendora-bg disabled:opacity-40"
                 >
                   Next
                 </button>
@@ -648,20 +590,24 @@ export default function SalesPage() {
         </div>
       )}
 
-      {/* Create Sale Modal */}
-      <CreateSaleModal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onSuccess={handleSaleCreated}
-      />
+      {/* Create Sale Modal (lazy) */}
+      {createModalOpen && (
+        <CreateSaleModal
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onSuccess={handleSaleCreated}
+        />
+      )}
 
-      {/* Sale Details Modal */}
-      <SaleDetailsModal
-        open={detailsModalOpen}
-        onClose={() => setDetailsModalOpen(false)}
-        sale={selectedSale}
-        onCancelRequest={(s) => handleRequestCancel(s)}
-      />
+      {/* Sale Details Modal (lazy) */}
+      {detailsModalOpen && (
+        <SaleDetailsModal
+          open={detailsModalOpen}
+          onClose={() => setDetailsModalOpen(false)}
+          sale={selectedSale}
+          onCancelRequest={(s) => handleRequestCancel(s)}
+        />
+      )}
 
       {/* Confirm Cancellation Modal */}
       <ConfirmModal

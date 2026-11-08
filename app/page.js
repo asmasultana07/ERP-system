@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import Logo from "../components/Logo";
+import ThemeToggle from "../components/ThemeToggle";
 import { saveSession } from "../lib/auth";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -87,8 +89,11 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-full flex-1 items-center justify-center bg-vendora-bg px-4 py-10">
-      <section className="grid w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-xl shadow-vendora/10 md:grid-cols-2">
+    <main className="relative flex min-h-full flex-1 items-center justify-center bg-vendora-bg px-4 py-10">
+      <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+        <ThemeToggle className="bg-surface" />
+      </div>
+      <section className="grid w-full max-w-5xl overflow-hidden rounded-3xl bg-surface shadow-xl shadow-vendora/10 md:grid-cols-2">
         <div className="hidden flex-col justify-between bg-vendora-dark px-10 py-12 text-white md:flex">
           <div className="flex items-center gap-3">
             <Logo className="h-11 w-11" decorative />
@@ -183,6 +188,13 @@ export default function LoginPage() {
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
+
+            <p className="text-center text-sm text-vendora-text/70">
+              Don&apos;t have an account?{" "}
+              <Link href="/register" className="font-medium text-vendora hover:underline">
+                Create account
+              </Link>
+            </p>
           </form>
         </div>
       </section>

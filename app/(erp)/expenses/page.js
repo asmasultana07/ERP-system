@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { getExpenses, createExpense, updateExpense, deleteExpense } from "../../../lib/api";
+import { useResource, invalidate } from "../../../lib/useResource";
 import Modal from "../../../components/Modal";
 import ConfirmModal from "../../../components/ConfirmModal";
 import Toast from "../../../components/Toast";
+import { SkeletonTable } from "../../../components/Skeleton";
 import {
   SearchIcon, PlusIcon, EditIcon, TrashIcon, RefreshIcon,
   EyeIcon, CloseIcon, AlertTriangleIcon,
@@ -81,7 +83,7 @@ function ExpenseFormModal({ open, onClose, onSuccess, initial }) {
     }
   }
 
-  const inputCls = "w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-white focus:ring-2 focus:ring-vendora-accent/20";
+  const inputCls = "w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-surface focus:ring-2 focus:ring-vendora-accent/20";
   const labelCls = "block text-xs font-semibold text-vendora-text/70 mb-1";
 
   return (
@@ -178,20 +180,14 @@ function ExpenseDetailsModal({ open, onClose, expense, onEdit }) {
 }
 
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState([]);
-  const [summary, setSummary] = useState({ totalAmount: 0, paidTotal: 0, unpaidTotal: 0 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [methodFilter, setMethodFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -202,36 +198,38 @@ export default function ExpensesPage() {
 
   const [toast, setToast] = useState({ message: "", type: "success" });
 
-  const loadExpenses = useCallback(async (
-    pg = page, q = search, cat = categoryFilter, meth = methodFilter,
-    stat = statusFilter, sd = startDate, ed = endDate
-  ) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await getExpenses({ page: pg, limit: 10, search: q, category: cat, paymentMethod: meth, status: stat, startDate: sd, endDate: ed });
-      if (res?.success) {
-        setExpenses(res.expenses || []);
-        setSummary(res.summary || { totalAmount: 0, paidTotal: 0, unpaidTotal: 0 });
-        setTotalPages(res.totalPages || 1);
-        setTotalCount(res.total || 0);
-        setPage(res.currentPage || 1);
-      } else {
-        setError(res?.message || "Failed to load expenses.");
-      }
-    } catch (err) {
-      setError(err.message || "Failed to connect to the server.");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, categoryFilter, methodFilter, statusFilter, startDate, endDate]);
+  // Cached, stale-while-revalidate. Key includes page + all applied filters so
+  // paging back/forth or revisiting the module is instant from cache.
+  const cacheKey = `expenses:${page}|${appliedSearch}|${categoryFilter}|${methodFilter}|${statusFilter}|${startDate}|${endDate}`;
+  const { data, loading, error, refresh, refreshing } = useResource(cacheKey, () =>
+    getExpenses({
+      page,
+      limit: 10,
+      search: appliedSearch,
+      category: categoryFilter,
+      paymentMethod: methodFilter,
+      status: statusFilter,
+      startDate,
+      endDate,
+    })
+  );
 
-  useEffect(() => { loadExpenses(); }, [loadExpenses]);
+  const expenses = data?.expenses || [];
+  const summary = data?.summary || { totalAmount: 0, paidTotal: 0, unpaidTotal: 0 };
+  const totalPages = data?.totalPages || 1;
+  const totalCount = data?.total || 0;
+  const errMsg = error ? error.message || "Failed to load expenses." : "";
+
+  function reloadAfterMutation() {
+    invalidate("expenses:");
+    invalidate("dashboard");
+    setPage(1);
+    refresh();
+  }
 
   function handleReset() {
-    setSearch(""); setCategoryFilter("all"); setMethodFilter("all");
+    setSearch(""); setAppliedSearch(""); setCategoryFilter("all"); setMethodFilter("all");
     setStatusFilter("all"); setStartDate(""); setEndDate(""); setPage(1);
-    loadExpenses(1, "", "all", "all", "all", "", "");
   }
 
   async function handleDelete() {
@@ -242,8 +240,7 @@ export default function ExpensesPage() {
       if (res?.success) {
         setToast({ type: "success", message: `Expense "${deleteTarget.expenseNumber}" deleted.` });
         setDeleteTarget(null);
-        loadExpenses(1, search, categoryFilter, methodFilter, statusFilter, startDate, endDate);
-        setPage(1);
+        reloadAfterMutation();
       } else {
         setToast({ type: "error", message: res?.message || "Failed to delete." });
       }
@@ -256,8 +253,7 @@ export default function ExpensesPage() {
 
   function handleSaved(expense, isNew) {
     setToast({ type: "success", message: isNew ? `Expense "${expense.expenseNumber}" created.` : `Expense "${expense.expenseNumber}" updated.` });
-    loadExpenses(1, search, categoryFilter, methodFilter, statusFilter, startDate, endDate);
-    setPage(1);
+    reloadAfterMutation();
   }
 
   const hasFilters = Boolean(search) || categoryFilter !== "all" || methodFilter !== "all" || statusFilter !== "all" || Boolean(startDate) || Boolean(endDate);
@@ -273,8 +269,8 @@ export default function ExpensesPage() {
           <p className="mt-1 text-sm text-vendora-text/70">Track and manage all business operating expenses.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => loadExpenses()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg disabled:opacity-50">
-            <RefreshIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <button type="button" onClick={refresh} disabled={refreshing} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg disabled:opacity-50">
+            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
           <button type="button" onClick={() => { setEditTarget(null); setFormOpen(true); }} className="inline-flex items-center gap-2 rounded-xl bg-vendora px-4 py-2.5 text-sm font-medium text-white hover:bg-vendora-dark">
@@ -290,7 +286,7 @@ export default function ExpensesPage() {
           { label: "Paid", value: fmt(summary.paidTotal), cls: "text-emerald-700" },
           { label: "Unpaid", value: fmt(summary.unpaidTotal), cls: summary.unpaidTotal > 0 ? "text-amber-700" : "text-vendora-text" },
         ].map((c) => (
-          <div key={c.label} className="rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs">
+          <div key={c.label} className="rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs">
             <p className="text-xs font-semibold uppercase tracking-wider text-vendora">{c.label}</p>
             <p className={`mt-2 text-2xl font-bold ${c.cls}`}>{loading ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-vendora-bg" /> : c.value}</p>
           </div>
@@ -298,15 +294,15 @@ export default function ExpensesPage() {
       </div>
 
       {/* Filters */}
-      <div className="space-y-3 rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs">
+      <div className="space-y-3 rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <form onSubmit={(e) => { e.preventDefault(); setPage(1); loadExpenses(1); }} className="relative flex-1">
+          <form onSubmit={(e) => { e.preventDefault(); setAppliedSearch(search); setPage(1); }} className="relative flex-1">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-vendora-text/40">
               <SearchIcon className="h-4 w-4" />
             </div>
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by expense number or title..." className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none focus:border-vendora focus:bg-white focus:ring-2 focus:ring-vendora-accent/20" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by expense number or title..." className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none focus:border-vendora focus:bg-surface focus:ring-2 focus:ring-vendora-accent/20" />
             {search && (
-              <button type="button" onClick={() => { setSearch(""); setPage(1); loadExpenses(1, "", categoryFilter, methodFilter, statusFilter, startDate, endDate); }} className="absolute inset-y-0 right-0 flex items-center pr-3 text-vendora-text/40 hover:text-vendora-text">
+              <button type="button" onClick={() => { setSearch(""); setAppliedSearch(""); setPage(1); }} className="absolute inset-y-0 right-0 flex items-center pr-3 text-vendora-text/40 hover:text-vendora-text">
                 <CloseIcon className="h-4 w-4" />
               </button>
             )}
@@ -315,13 +311,13 @@ export default function ExpensesPage() {
 
         <div className="flex flex-wrap items-center gap-3 border-t border-vendora/10 pt-3 text-xs">
           {[
-            { label: "Category:", value: categoryFilter, set: (v) => { setCategoryFilter(v); setPage(1); loadExpenses(1, search, v, methodFilter, statusFilter, startDate, endDate); }, options: [["all", "All"], ...CATEGORIES.map((c) => [c, c])] },
-            { label: "Method:", value: methodFilter, set: (v) => { setMethodFilter(v); setPage(1); loadExpenses(1, search, categoryFilter, v, statusFilter, startDate, endDate); }, options: [["all", "All"], ...PAYMENT_METHODS.map((m) => [m, m])] },
-            { label: "Status:", value: statusFilter, set: (v) => { setStatusFilter(v); setPage(1); loadExpenses(1, search, categoryFilter, methodFilter, v, startDate, endDate); }, options: [["all", "All"], ["Paid", "Paid"], ["Unpaid", "Unpaid"]] },
+            { label: "Category:", value: categoryFilter, set: (v) => { setCategoryFilter(v); setPage(1); }, options: [["all", "All"], ...CATEGORIES.map((c) => [c, c])] },
+            { label: "Method:", value: methodFilter, set: (v) => { setMethodFilter(v); setPage(1); }, options: [["all", "All"], ...PAYMENT_METHODS.map((m) => [m, m])] },
+            { label: "Status:", value: statusFilter, set: (v) => { setStatusFilter(v); setPage(1); }, options: [["all", "All"], ["Paid", "Paid"], ["Unpaid", "Unpaid"]] },
           ].map(({ label, value, set, options }) => (
             <div key={label} className="flex items-center gap-1.5">
               <span className="font-semibold uppercase tracking-wider text-vendora-text/70">{label}</span>
-              <select value={value} onChange={(e) => set(e.target.value)} className="rounded-lg border border-vendora/15 bg-white px-2.5 py-1.5 text-xs text-vendora-text outline-none">
+              <select value={value} onChange={(e) => set(e.target.value)} className="rounded-lg border border-vendora/15 bg-surface px-2.5 py-1.5 text-xs text-vendora-text outline-none">
                 {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -329,11 +325,11 @@ export default function ExpensesPage() {
 
           <div className="flex items-center gap-1.5">
             <span className="font-semibold uppercase tracking-wider text-vendora-text/70">From:</span>
-            <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); loadExpenses(1, search, categoryFilter, methodFilter, statusFilter, e.target.value, endDate); }} className="rounded-lg border border-vendora/15 bg-white px-2 py-1 text-xs text-vendora-text outline-none" />
+            <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="rounded-lg border border-vendora/15 bg-surface px-2 py-1 text-xs text-vendora-text outline-none" />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="font-semibold uppercase tracking-wider text-vendora-text/70">To:</span>
-            <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); loadExpenses(1, search, categoryFilter, methodFilter, statusFilter, startDate, e.target.value); }} className="rounded-lg border border-vendora/15 bg-white px-2 py-1 text-xs text-vendora-text outline-none" />
+            <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="rounded-lg border border-vendora/15 bg-surface px-2 py-1 text-xs text-vendora-text outline-none" />
           </div>
 
           {hasFilters && (
@@ -343,20 +339,17 @@ export default function ExpensesPage() {
       </div>
 
       {/* Table */}
-      {error ? (
-        <div role="alert" className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+      {errMsg ? (
+        <div role="alert" className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center dark:bg-red-500/5">
           <AlertTriangleIcon className="h-8 w-8 text-red-600" />
-          <h3 className="mt-3 text-base font-semibold text-red-800">Failed to Load Expenses</h3>
-          <p className="mt-1 text-sm text-red-600">{error}</p>
-          <button type="button" onClick={() => loadExpenses()} className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Retry</button>
+          <h3 className="mt-3 text-base font-semibold text-red-800 dark:text-red-300">Failed to Load Expenses</h3>
+          <p className="mt-1 text-sm text-red-600">{errMsg}</p>
+          <button type="button" onClick={refresh} className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Retry</button>
         </div>
-      ) : loading && expenses.length === 0 ? (
-        <div className="rounded-2xl border border-vendora/10 bg-white p-8 text-center shadow-xs">
-          <div className="inline-flex h-12 w-12 animate-spin items-center justify-center rounded-full border-4 border-vendora/20 border-t-vendora" />
-          <p className="mt-4 text-sm text-vendora-text/80">Loading expenses...</p>
-        </div>
+      ) : loading ? (
+        <SkeletonTable rows={8} cols={7} />
       ) : expenses.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-white p-12 text-center shadow-xs">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-surface p-12 text-center shadow-xs">
           <h3 className="text-lg font-semibold text-vendora-text">No Expenses Found</h3>
           <p className="mt-1 text-sm text-vendora-text/70">{hasFilters ? "No expenses match the selected filters." : "Add your first expense to start tracking costs."}</p>
           <div className="mt-6 flex gap-3">
@@ -367,7 +360,7 @@ export default function ExpensesPage() {
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
+        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-surface shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <thead>
@@ -421,9 +414,9 @@ export default function ExpensesPage() {
             <div>Showing <strong>{expenses.length}</strong> of <strong>{totalCount}</strong> expenses</div>
             {totalPages > 1 && (
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => { const p = Math.max(1, page - 1); setPage(p); loadExpenses(p); }} disabled={page <= 1 || loading} className="rounded-lg border border-vendora/20 bg-white px-3 py-1.5 font-medium hover:bg-vendora-bg disabled:opacity-40">Previous</button>
+                <button type="button" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1 || loading} className="rounded-lg border border-vendora/20 bg-surface px-3 py-1.5 font-medium hover:bg-vendora-bg disabled:opacity-40">Previous</button>
                 <span className="px-2">Page {page} of {totalPages}</span>
-                <button type="button" onClick={() => { const p = Math.min(totalPages, page + 1); setPage(p); loadExpenses(p); }} disabled={page >= totalPages || loading} className="rounded-lg border border-vendora/20 bg-white px-3 py-1.5 font-medium hover:bg-vendora-bg disabled:opacity-40">Next</button>
+                <button type="button" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages || loading} className="rounded-lg border border-vendora/20 bg-surface px-3 py-1.5 font-medium hover:bg-vendora-bg disabled:opacity-40">Next</button>
               </div>
             )}
           </div>

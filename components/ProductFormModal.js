@@ -388,7 +388,7 @@ export default function ProductFormModal({
                   if (e.target.value) handleChange("unit", e.target.value);
                 }}
                 value={COMMON_UNITS.includes(formData.unit) ? formData.unit : ""}
-                className="rounded-xl border border-vendora/20 bg-white px-2 py-2.5 text-sm text-vendora-text outline-none"
+                className="rounded-xl border border-vendora/20 bg-surface px-2 py-2.5 text-sm text-vendora-text outline-none"
               >
                 <option value="">Select...</option>
                 {COMMON_UNITS.map((u) => (
@@ -413,7 +413,7 @@ export default function ProductFormModal({
               value={formData.isActive ? "true" : "false"}
               onChange={(e) => handleChange("isActive", e.target.value === "true")}
               disabled={loading}
-              className="mt-1.5 w-full rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/30"
+              className="mt-1.5 w-full rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/30"
             >
               <option value="true">Active</option>
               <option value="false">Inactive</option>

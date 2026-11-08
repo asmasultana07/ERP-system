@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import {
   getProducts,
   deleteProduct,
 } from "../../../lib/api";
-import ProductFormModal from "../../../components/ProductFormModal";
+import { useResource, invalidate } from "../../../lib/useResource";
 import ConfirmModal from "../../../components/ConfirmModal";
 import Toast from "../../../components/Toast";
+import { SkeletonTable } from "../../../components/Skeleton";
 import {
   SearchIcon,
   PlusIcon,
@@ -19,11 +21,15 @@ import {
   CloseIcon,
 } from "../../../components/Icons";
 
+// Lazy-loaded: the form modal chunk is fetched only when first opened.
+const ProductFormModal = dynamic(
+  () => import("../../../components/ProductFormModal"),
+  { ssr: false }
+);
+
 export default function ProductsPage() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   // Modals state
@@ -36,27 +42,26 @@ export default function ProductsPage() {
   // Toast feedback state
   const [toast, setToast] = useState({ message: "", type: "success" });
 
-  const loadProducts = useCallback(async (search = searchQuery, category = selectedCategory) => {
-    setLoading(true);
-    setError("");
+  // Cached, stale-while-revalidate data. Returning to this page with the same
+  // filters renders instantly from cache while revalidating in the background.
+  const cacheKey = `products:${appliedSearch}|${selectedCategory}`;
+  const {
+    data: products = [],
+    loading,
+    error,
+    refresh,
+    refreshing,
+  } = useResource(cacheKey, async () => {
+    const data = await getProducts({ search: appliedSearch, category: selectedCategory });
+    return data?.products || [];
+  });
+  const errorMsg = error ? error.message || "Failed to load products" : "";
 
-    try {
-      const data = await getProducts({ search, category });
-      if (data?.success) {
-        setProducts(data.products || []);
-      } else {
-        setError(data?.message || "Failed to load products");
-      }
-    } catch (err) {
-      setError(err.message || "Failed to connect to the server.");
-    } finally {
-      setLoading(false);
-    }
-  }, [searchQuery, selectedCategory]);
-
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+  function reloadAfterMutation() {
+    invalidate("products:");
+    invalidate("dashboard");
+    refresh();
+  }
 
   // Extract unique categories for filter dropdown
   const categories = useMemo(() => {
@@ -70,25 +75,22 @@ export default function ProductsPage() {
   }, [products]);
 
   function handleSearchChange(e) {
-    const val = e.target.value;
-    setSearchQuery(val);
+    setSearchQuery(e.target.value);
   }
 
   function handleSearchSubmit(e) {
     e.preventDefault();
-    loadProducts(searchQuery, selectedCategory);
+    setAppliedSearch(searchQuery);
   }
 
   function handleCategoryChange(e) {
-    const cat = e.target.value;
-    setSelectedCategory(cat);
-    loadProducts(searchQuery, cat);
+    setSelectedCategory(e.target.value);
   }
 
   function handleClearFilters() {
     setSearchQuery("");
+    setAppliedSearch("");
     setSelectedCategory("all");
-    loadProducts("", "all");
   }
 
   // Open Add Product Modal
@@ -115,14 +117,17 @@ export default function ProductsPage() {
 
     setDeleting(true);
     try {
-      await deleteProduct(productToDelete.id);
+      const res = await deleteProduct(productToDelete.id);
+      const fallbackMessage = res?.deactivated
+        ? `Product "${productToDelete.name}" was deactivated because it has transaction history.`
+        : `Product "${productToDelete.name}" deleted successfully.`;
       setToast({
         type: "success",
-        message: `Product "${productToDelete.name}" deleted successfully.`,
+        message: res?.message || fallbackMessage,
       });
       setDeleteModalOpen(false);
       setProductToDelete(null);
-      loadProducts();
+      reloadAfterMutation();
     } catch (err) {
       setToast({
         type: "error",
@@ -141,7 +146,7 @@ export default function ProductsPage() {
         ? `Product "${savedProduct.name}" updated successfully.`
         : `Product "${savedProduct.name}" added successfully.`,
     });
-    loadProducts();
+    reloadAfterMutation();
   }
 
   // Stock status helper
@@ -193,12 +198,12 @@ export default function ProductsPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => loadProducts()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
+            onClick={refresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
             title="Refresh list"
           >
-            <RefreshIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
@@ -214,7 +219,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <form
           onSubmit={handleSearchSubmit}
           className="relative flex-1"
@@ -227,14 +232,14 @@ export default function ProductsPage() {
             value={searchQuery}
             onChange={handleSearchChange}
             placeholder="Search by product name or SKU..."
-            className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-white focus:ring-2 focus:ring-vendora-accent/20"
+            className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none transition focus:border-vendora focus:bg-surface focus:ring-2 focus:ring-vendora-accent/20"
           />
           {searchQuery ? (
             <button
               type="button"
               onClick={() => {
                 setSearchQuery("");
-                loadProducts("", selectedCategory);
+                setAppliedSearch("");
               }}
               className="absolute inset-y-0 right-0 flex items-center pr-3 text-vendora-text/40 hover:text-vendora-text"
               aria-label="Clear search"
@@ -256,7 +261,7 @@ export default function ProductsPage() {
               id="category-filter"
               value={selectedCategory}
               onChange={handleCategoryChange}
-              className="rounded-xl border border-vendora/15 bg-white px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/20"
+              className="rounded-xl border border-vendora/15 bg-surface px-3 py-2 text-sm text-vendora-text outline-none transition focus:border-vendora focus:ring-2 focus:ring-vendora-accent/20"
             >
               <option value="all">All Categories</option>
               {categories.map((cat) => (
@@ -280,38 +285,31 @@ export default function ProductsPage() {
       </div>
 
       {/* Main Content Area */}
-      {error ? (
+      {errorMsg ? (
         <div
           role="alert"
-          className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center"
+          className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-8 text-center dark:bg-red-500/5"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
             <AlertTriangleIcon className="h-6 w-6" />
           </div>
-          <h3 className="mt-3 text-base font-semibold text-red-800">
+          <h3 className="mt-3 text-base font-semibold text-red-800 dark:text-red-300">
             Failed to Load Products
           </h3>
-          <p className="mt-1 max-w-md text-sm text-red-600">{error}</p>
+          <p className="mt-1 max-w-md text-sm text-red-600">{errorMsg}</p>
           <button
             type="button"
-            onClick={() => loadProducts()}
+            onClick={refresh}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
           >
             <RefreshIcon className="h-4 w-4" />
             Retry
           </button>
         </div>
-      ) : loading && products.length === 0 ? (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
-          <div className="p-8 text-center">
-            <div className="inline-flex h-12 w-12 animate-spin items-center justify-center rounded-full border-4 border-vendora/20 border-t-vendora"></div>
-            <p className="mt-4 text-sm font-medium text-vendora-text/80">
-              Loading products...
-            </p>
-          </div>
-        </div>
+      ) : loading ? (
+        <SkeletonTable rows={6} cols={8} />
       ) : products.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-white p-12 text-center shadow-xs">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-vendora/20 bg-surface p-12 text-center shadow-xs">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-vendora-bg text-vendora">
             <PackageIcon className="h-7 w-7" />
           </div>
@@ -344,7 +342,7 @@ export default function ProductsPage() {
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
+        <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-surface shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -502,13 +500,15 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Add / Edit Product Modal */}
-      <ProductFormModal
-        open={formModalOpen}
-        onClose={() => setFormModalOpen(false)}
-        product={editingProduct}
-        onSuccess={handleFormSuccess}
-      />
+      {/* Add / Edit Product Modal (lazy: chunk loads on first open) */}
+      {formModalOpen && (
+        <ProductFormModal
+          open={formModalOpen}
+          onClose={() => setFormModalOpen(false)}
+          product={editingProduct}
+          onSuccess={handleFormSuccess}
+        />
+      )}
 
       {/* Confirm Delete Modal */}
       <ConfirmModal
@@ -516,7 +516,7 @@ export default function ProductsPage() {
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Delete Product"
-        message={`Are you sure you want to delete "${productToDelete?.name}" (${productToDelete?.sku})? This product will be permanently removed.`}
+        message={`Are you sure you want to delete "${productToDelete?.name}" (${productToDelete?.sku})? If this product appears in any purchase or sale history, it will be deactivated instead of permanently removed to protect your records.`}
         confirmText="Delete Product"
         loading={deleting}
       />

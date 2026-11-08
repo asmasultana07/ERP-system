@@ -19,7 +19,7 @@ function fmt(n) { return `$${Number(n || 0).toFixed(2)}`; }
 
 function SummaryCard({ label, value, sub, highlight = "text-vendora-dark", warn }) {
   return (
-    <div className={`rounded-2xl border bg-white p-4 shadow-xs ${warn ? "border-amber-200" : "border-vendora/10"}`}>
+    <div className={`rounded-2xl border bg-surface p-4 shadow-xs ${warn ? "border-amber-200" : "border-vendora/10"}`}>
       <p className="text-xs font-semibold uppercase tracking-wider text-vendora">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${highlight}`}>{value}</p>
       {sub && <p className="mt-1 text-xs text-vendora-text/60">{sub}</p>}
@@ -32,7 +32,7 @@ function SectionHeader({ title }) {
 }
 
 function TableWrapper({ children }) {
-  return <div className="overflow-x-auto rounded-xl border border-vendora/10 bg-white shadow-xs">{children}</div>;
+  return <div className="overflow-x-auto rounded-xl border border-vendora/10 bg-surface shadow-xs">{children}</div>;
 }
 
 function exportCSV(headers, rows, filename) {
@@ -126,17 +126,17 @@ export default function ReportsPage() {
           <p className="mt-1 text-sm text-vendora-text/70">Real-time business intelligence from verified database records.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={fetchAll} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg">
+          <button type="button" onClick={fetchAll} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg">
             <RefreshIcon className="h-4 w-4" /><span className="hidden sm:inline">Refresh</span>
           </button>
-          <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg">
+          <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg">
             🖨 <span className="hidden sm:inline">Print</span>
           </button>
         </div>
       </div>
 
       {/* Date Range Selector */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs">
         <span className="text-xs font-semibold uppercase tracking-wider text-vendora-text/70">Period:</span>
         {PRESETS.map((p) => (
           <button key={p.value} type="button" onClick={() => setPreset(p.value)}
@@ -146,9 +146,9 @@ export default function ReportsPage() {
         ))}
         {preset === "custom" && (
           <div className="flex items-center gap-2 text-xs">
-            <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="rounded-lg border border-vendora/15 bg-white px-2 py-1.5 text-xs text-vendora-text outline-none" />
+            <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="rounded-lg border border-vendora/15 bg-surface px-2 py-1.5 text-xs text-vendora-text outline-none" />
             <span className="text-vendora-text/60">to</span>
-            <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="rounded-lg border border-vendora/15 bg-white px-2 py-1.5 text-xs text-vendora-text outline-none" />
+            <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="rounded-lg border border-vendora/15 bg-surface px-2 py-1.5 text-xs text-vendora-text outline-none" />
           </div>
         )}
       </div>
@@ -168,7 +168,7 @@ export default function ReportsPage() {
 
         {/* Sales Trend */}
         {salesData?.trend?.length > 0 && (
-          <div className="rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs">
+          <div className="rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs">
             <p className="text-xs font-semibold uppercase tracking-wider text-vendora mb-3">Sales Trend</p>
             <div className="flex items-end gap-1 h-24 overflow-x-auto">
               {(() => {

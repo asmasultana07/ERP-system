@@ -1,18 +1,67 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode: `dark:` utilities respond to a `.dark` class
+   on <html> (set by the theme toggle / FOUC script), not only the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #f0fdf4;
-  --foreground: #1f2937;
+  color-scheme: light;
+
+  /* Themed tokens (change between light and dark) */
+  --page-bg: #f0fdf4;   /* app background */
+  --surface: #ffffff;   /* cards, inputs, modals, popovers */
+  --text: #1f2937;      /* primary text */
+  --brand: #064e3b;     /* VENDORA deep green — buttons, links, borders */
+  --brand-accent: #10b981;
+
+  /* Fixed brand surface (deep green sidebar / backdrops) — same in both modes */
+  --brand-dark: #022c22;
+
+  --background: var(--page-bg);
+  --foreground: var(--text);
+
+  /* Chart categorical palette — validated (dataviz skill) for colorblind-safe
+     separation in both light and dark. Used by the category-distribution donut. */
+  --series-1: #2a78d6;  /* blue */
+  --series-2: #eb6834;  /* orange */
+  --series-3: #1baf7a;  /* aqua */
+  --series-4: #eda100;  /* yellow */
+  --series-5: #e87ba4;  /* magenta */
+  --series-6: #008300;  /* green */
+  --series-7: #4a3aa7;  /* violet */
+  --series-8: #e34948;  /* red */
+}
+
+.dark {
+  color-scheme: dark;
+
+  --page-bg: #07130f;   /* deep green-black */
+  --surface: #0e211a;   /* elevated green-tinted surface */
+  --text: #e6edea;      /* near-white */
+  --brand: #10b981;     /* brighter green for contrast on dark surfaces */
+  --brand-accent: #34d399;
+  /* --brand-dark stays #022c22 so the sidebar keeps its deep-green identity */
+
+  /* Dark-stepped chart palette (same hues, re-stepped for the dark surface). */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-vendora: #064e3b;
-  --color-vendora-dark: #022c22;
-  --color-vendora-accent: #10b981;
-  --color-vendora-bg: #f0fdf4;
-  --color-vendora-text: #1f2937;
+  --color-vendora: var(--brand);
+  --color-vendora-dark: var(--brand-dark);
+  --color-vendora-accent: var(--brand-accent);
+  --color-vendora-bg: var(--page-bg);
+  --color-vendora-text: var(--text);
+  --color-surface: var(--surface);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -21,4 +70,16 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
+}
+
+/* ---- Dark-mode contrast fixes for tokens that do double duty ----
+   `text-vendora-dark` is used for headings/table labels. In light mode it is the
+   deep green brand; on a dark surface that is unreadable, so remap it (and its
+   hover form) to the primary text color. Placed outside @layer so it reliably
+   wins over the generated utility. */
+.dark .text-vendora-dark {
+  color: var(--text);
+}
+.dark .hover\:text-vendora-dark:hover {
+  color: var(--text);
 }

@@ -94,7 +94,7 @@ export default function SaleDetailsModal({
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm border-collapse">
               <thead>
-                <tr className="border-b border-vendora/10 bg-white text-xs font-semibold text-vendora-text/70">
+                <tr className="border-b border-vendora/10 bg-surface text-xs font-semibold text-vendora-text/70">
                   <th className="px-4 py-2.5">Product</th>
                   <th className="px-4 py-2.5">SKU</th>
                   <th className="px-4 py-2.5 text-center">Quantity</th>
@@ -102,7 +102,7 @@ export default function SaleDetailsModal({
                   <th className="px-4 py-2.5 text-right">Subtotal</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-vendora/5 bg-white">
+              <tbody className="divide-y divide-vendora/5 bg-surface">
                 {(sale.items || []).map((it, idx) => (
                   <tr key={idx} className="hover:bg-vendora-bg/20">
                     <td className="px-4 py-3 font-medium text-vendora-text">

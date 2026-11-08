@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { getInventoryLowStock, getInventoryOutOfStock, getInventorySummary } from "../../../lib/api";
+import { useResource } from "../../../lib/useResource";
 import { SearchIcon, RefreshIcon, AlertTriangleIcon, CloseIcon } from "../../../components/Icons";
 
 function fmt(n) { return Number(n || 0).toLocaleString(); }
@@ -15,7 +16,7 @@ function StockBadge({ qty }) {
 function ProductTable({ items, loading, error, showReorder }) {
   if (loading) {
     return (
-      <div className="rounded-2xl border border-vendora/10 bg-white p-8 text-center shadow-xs">
+      <div className="rounded-2xl border border-vendora/10 bg-surface p-8 text-center shadow-xs">
         <div className="inline-flex h-10 w-10 animate-spin rounded-full border-4 border-vendora/20 border-t-vendora" />
         <p className="mt-3 text-sm text-vendora-text/70">Loading...</p>
       </div>
@@ -30,14 +31,14 @@ function ProductTable({ items, loading, error, showReorder }) {
   }
   if (!items?.length) {
     return (
-      <div className="rounded-2xl border border-dashed border-vendora/20 bg-white p-8 text-center shadow-xs">
+      <div className="rounded-2xl border border-dashed border-vendora/20 bg-surface p-8 text-center shadow-xs">
         <p className="text-sm text-vendora-text/60">No products found.</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-white shadow-xs">
+    <div className="overflow-hidden rounded-2xl border border-vendora/10 bg-surface shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left text-sm">
           <thead>
@@ -81,49 +82,36 @@ function ProductTable({ items, loading, error, showReorder }) {
 export default function InventoryAlertsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
-
-  const [summary, setSummary] = useState(null);
-  const [lowStock, setLowStock] = useState([]);
-  const [outOfStock, setOutOfStock] = useState([]);
-
-  const [loadingSum, setLoadingSum] = useState(true);
-  const [loadingLow, setLoadingLow] = useState(true);
-  const [loadingOut, setLoadingOut] = useState(true);
-  const [errorLow, setErrorLow] = useState("");
-  const [errorOut, setErrorOut] = useState("");
+  const [applied, setApplied] = useState({ search: "", category: "" });
 
   const [activeTab, setActiveTab] = useState("low");
 
-  const loadData = useCallback(async (q = search, cat = category) => {
-    setLoadingSum(true);
-    setLoadingLow(true);
-    setLoadingOut(true);
-    setErrorLow("");
-    setErrorOut("");
+  const cacheKey = `inventory:${applied.search}|${applied.category}`;
+  const { data, loading, error, refresh, refreshing } = useResource(
+    cacheKey,
+    async () => {
+      const [sum, low, out] = await Promise.all([
+        getInventorySummary(),
+        getInventoryLowStock(applied),
+        getInventoryOutOfStock(applied),
+      ]);
+      return {
+        summary: sum?.summary || null,
+        lowStock: low?.items || [],
+        outOfStock: out?.items || [],
+      };
+    }
+  );
 
-    const [sumRes, lowRes, outRes] = await Promise.allSettled([
-      getInventorySummary(),
-      getInventoryLowStock({ search: q, category: cat }),
-      getInventoryOutOfStock({ search: q, category: cat }),
-    ]);
-
-    if (sumRes.status === "fulfilled" && sumRes.value?.success) setSummary(sumRes.value.summary);
-    setLoadingSum(false);
-
-    if (lowRes.status === "fulfilled" && lowRes.value?.success) setLowStock(lowRes.value.items || []);
-    else setErrorLow(lowRes.reason?.message || "Failed to load low stock.");
-    setLoadingLow(false);
-
-    if (outRes.status === "fulfilled" && outRes.value?.success) setOutOfStock(outRes.value.items || []);
-    else setErrorOut(outRes.reason?.message || "Failed to load out of stock.");
-    setLoadingOut(false);
-  }, [search, category]);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  const summary = data?.summary || null;
+  const lowStock = data?.lowStock || [];
+  const outOfStock = data?.outOfStock || [];
+  const loadingSum = loading;
+  const errMsg = error ? error.message || "Failed to load inventory." : "";
 
   function handleSearch(e) {
     e.preventDefault();
-    loadData(search, category);
+    setApplied({ search, category });
   }
 
   return (
@@ -135,8 +123,8 @@ export default function InventoryAlertsPage() {
           <p className="mt-1 text-sm text-vendora-text/70">Monitor low stock and out-of-stock products. Reorder quantities are suggestions only.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => loadData()} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-white px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg">
-            <RefreshIcon className="h-4 w-4" /><span className="hidden sm:inline">Refresh</span>
+          <button type="button" onClick={refresh} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg">
+            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /><span className="hidden sm:inline">Refresh</span>
           </button>
           <Link href="/products" className="inline-flex items-center gap-2 rounded-xl bg-vendora px-4 py-2.5 text-sm font-medium text-white hover:bg-vendora-dark">
             Manage Products
@@ -146,18 +134,18 @@ export default function InventoryAlertsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs">
+        <div className="rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs">
           <p className="text-xs font-semibold uppercase tracking-wider text-vendora">Total Active Products</p>
           <p className="mt-2 text-2xl font-bold text-vendora-dark">{loadingSum ? "…" : fmt(summary?.totalActive)}</p>
         </div>
-        <div className={`rounded-2xl border bg-white p-4 shadow-xs ${summary?.lowStock > 0 ? "border-amber-200" : "border-vendora/10"}`}>
+        <div className={`rounded-2xl border bg-surface p-4 shadow-xs ${summary?.lowStock > 0 ? "border-amber-200" : "border-vendora/10"}`}>
           <p className="text-xs font-semibold uppercase tracking-wider text-vendora">Low Stock</p>
           <p className={`mt-2 text-2xl font-bold ${summary?.lowStock > 0 ? "text-amber-700" : "text-vendora-text"}`}>
             {loadingSum ? "…" : fmt(summary?.lowStock)}
           </p>
           {summary?.lowStock > 0 && <p className="mt-1 text-xs text-amber-600">Attention required</p>}
         </div>
-        <div className={`rounded-2xl border bg-white p-4 shadow-xs ${summary?.outOfStock > 0 ? "border-red-200" : "border-vendora/10"}`}>
+        <div className={`rounded-2xl border bg-surface p-4 shadow-xs ${summary?.outOfStock > 0 ? "border-red-200" : "border-vendora/10"}`}>
           <p className="text-xs font-semibold uppercase tracking-wider text-vendora">Out of Stock</p>
           <p className={`mt-2 text-2xl font-bold ${summary?.outOfStock > 0 ? "text-red-700" : "text-vendora-text"}`}>
             {loadingSum ? "…" : fmt(summary?.outOfStock)}
@@ -167,21 +155,21 @@ export default function InventoryAlertsPage() {
       </div>
 
       {/* Search & Filter */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-vendora/10 bg-white p-4 shadow-xs sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-2xl border border-vendora/10 bg-surface p-4 shadow-xs sm:flex-row sm:items-center">
         <form onSubmit={handleSearch} className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-vendora-text/40">
             <SearchIcon className="h-4 w-4" />
           </div>
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by product name or SKU..." className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none focus:border-vendora focus:bg-white focus:ring-2 focus:ring-vendora-accent/20" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by product name or SKU..." className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/30 py-2 pl-10 pr-10 text-sm text-vendora-text outline-none focus:border-vendora focus:bg-surface focus:ring-2 focus:ring-vendora-accent/20" />
           {search && (
-            <button type="button" onClick={() => { setSearch(""); loadData("", category); }} className="absolute inset-y-0 right-0 flex items-center pr-3 text-vendora-text/40 hover:text-vendora-text">
+            <button type="button" onClick={() => { setSearch(""); setApplied({ search: "", category }); }} className="absolute inset-y-0 right-0 flex items-center pr-3 text-vendora-text/40 hover:text-vendora-text">
               <CloseIcon className="h-4 w-4" />
             </button>
           )}
         </form>
         <div className="flex items-center gap-2 text-xs">
           <span className="font-semibold uppercase tracking-wider text-vendora-text/70">Category:</span>
-          <input type="text" value={category} onChange={(e) => { setCategory(e.target.value); loadData(search, e.target.value); }} placeholder="Filter by category..." className="rounded-xl border border-vendora/15 bg-white px-3 py-2 text-sm text-vendora-text outline-none focus:border-vendora" />
+          <input type="text" value={category} onChange={(e) => { setCategory(e.target.value); setApplied({ search, category: e.target.value }); }} placeholder="Filter by category..." className="rounded-xl border border-vendora/15 bg-surface px-3 py-2 text-sm text-vendora-text outline-none focus:border-vendora" />
         </div>
       </div>
 
@@ -200,12 +188,12 @@ export default function InventoryAlertsPage() {
       {activeTab === "low" ? (
         <div>
           <p className="mb-3 text-sm text-vendora-text/70">Products with stock at or below their reorder threshold. Suggested reorder quantities are estimates — not automatic orders.</p>
-          <ProductTable items={lowStock} loading={loadingLow} error={errorLow} showReorder />
+          <ProductTable items={lowStock} loading={loading} error={errMsg} showReorder />
         </div>
       ) : (
         <div>
           <p className="mb-3 text-sm text-vendora-text/70">Products with zero stock. These cannot be sold until restocked via a purchase order.</p>
-          <ProductTable items={outOfStock} loading={loadingOut} error={errorOut} showReorder />
+          <ProductTable items={outOfStock} loading={loading} error={errMsg} showReorder />
         </div>
       )}
 
