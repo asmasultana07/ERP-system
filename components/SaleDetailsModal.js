@@ -2,6 +2,7 @@
 
 import Modal from "./Modal";
 import { BanIcon } from "./Icons";
+import InvoicePrintView from "./InvoicePrintView";
 
 export default function SaleDetailsModal({
   open,
@@ -173,7 +174,7 @@ export default function SaleDetailsModal({
 
         {/* Bottom Actions */}
         <div className="flex items-center justify-between border-t border-vendora/10 pt-4">
-          <div>
+          <div className="flex items-center gap-2">
             {!isCancelled && (
               <button
                 type="button"
@@ -187,6 +188,7 @@ export default function SaleDetailsModal({
                 <span>Cancel Sale & Restore Stock</span>
               </button>
             )}
+            <InvoicePrintView sale={sale} />
           </div>
 
           <button
