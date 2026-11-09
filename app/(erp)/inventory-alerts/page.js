@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { getInventoryLowStock, getInventoryOutOfStock, getInventorySummary } from "../../../lib/api";
 import { useResource } from "../../../lib/useResource";
-import { SearchIcon, RefreshIcon, AlertTriangleIcon, CloseIcon } from "../../../components/Icons";
+import { SearchIcon, AlertTriangleIcon, CloseIcon } from "../../../components/Icons";
 
 function fmt(n) { return Number(n || 0).toLocaleString(); }
 
@@ -123,9 +123,6 @@ export default function InventoryAlertsPage() {
           <p className="mt-1 text-sm text-vendora-text/70">Monitor low stock and out-of-stock products. Reorder quantities are suggestions only.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={refresh} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg">
-            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /><span className="hidden sm:inline">Refresh</span>
-          </button>
           <Link href="/products" className="inline-flex items-center gap-2 rounded-xl bg-vendora px-4 py-2.5 text-sm font-medium text-white hover:bg-vendora-dark">
             Manage Products
           </Link>

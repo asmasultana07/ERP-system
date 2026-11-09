@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { getDashboardStats, getDashboardAnalytics } from "../../../lib/api";
 import { useResource } from "../../../lib/useResource";
-import { RefreshIcon, AlertTriangleIcon } from "../../../components/Icons";
+import { AlertTriangleIcon } from "../../../components/Icons";
 import { StatCard, Card, CardHeader } from "../../../components/Ui";
 import { Skeleton } from "../../../components/Skeleton";
 import { AreaChart, BarChart, DonutChart } from "../../../components/charts/Charts";
@@ -74,14 +74,6 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-bold tracking-tight text-vendora-text">Dashboard</h2>
           <p className="mt-1 text-sm text-vendora-text/60">Real-time metrics from your database. Cancelled orders are excluded.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => { statsRes.refresh(); analyticsRes.refresh(); }}
-          className="inline-flex items-center gap-2 self-start rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg"
-        >
-          <RefreshIcon className={`h-4 w-4 ${statsRes.refreshing ? "animate-spin" : ""}`} />
-          <span>Refresh</span>
-        </button>
       </div>
 
       {error ? (
@@ -92,7 +84,7 @@ export default function DashboardPage() {
           <h3 className="mt-3 text-base font-semibold text-red-800 dark:text-red-300">Failed to Load Dashboard</h3>
           <p className="mt-1 max-w-md text-sm text-red-600">{error.message}</p>
           <button type="button" onClick={statsRes.refresh} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
-            <RefreshIcon className="h-4 w-4" />Retry
+            Retry
           </button>
         </Card>
       ) : (

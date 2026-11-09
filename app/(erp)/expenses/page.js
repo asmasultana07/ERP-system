@@ -8,7 +8,7 @@ import ConfirmModal from "../../../components/ConfirmModal";
 import Toast from "../../../components/Toast";
 import { SkeletonTable } from "../../../components/Skeleton";
 import {
-  SearchIcon, PlusIcon, EditIcon, TrashIcon, RefreshIcon,
+  SearchIcon, PlusIcon, EditIcon, TrashIcon,
   EyeIcon, CloseIcon, AlertTriangleIcon,
 } from "../../../components/Icons";
 
@@ -269,10 +269,6 @@ export default function ExpensesPage() {
           <p className="mt-1 text-sm text-vendora-text/70">Track and manage all business operating expenses.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={refresh} disabled={refreshing} className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text hover:bg-vendora-bg disabled:opacity-50">
-            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
           <button type="button" onClick={() => { setEditTarget(null); setFormOpen(true); }} className="inline-flex items-center gap-2 rounded-xl bg-vendora px-4 py-2.5 text-sm font-medium text-white hover:bg-vendora-dark">
             <PlusIcon className="h-4 w-4" /><span>Add Expense</span>
           </button>

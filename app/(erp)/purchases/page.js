@@ -14,12 +14,13 @@ import { SkeletonTable } from "../../../components/Skeleton";
 
 const CreatePurchaseModal = dynamic(() => import("../../../components/CreatePurchaseModal"), { ssr: false });
 const PurchaseDetailsModal = dynamic(() => import("../../../components/PurchaseDetailsModal"), { ssr: false });
+const EditPurchaseModal = dynamic(() => import("../../../components/EditPurchaseModal"), { ssr: false });
 import {
   SearchIcon,
   PlusIcon,
-  RefreshIcon,
   ReceiptIcon,
   EyeIcon,
+  EditIcon,
   BanIcon,
   CloseIcon,
   AlertTriangleIcon,
@@ -42,6 +43,9 @@ export default function PurchasesPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [purchaseToEdit, setPurchaseToEdit] = useState(null);
 
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [purchaseToCancel, setPurchaseToCancel] = useState(null);
@@ -104,6 +108,20 @@ export default function PurchasesPage() {
   function handleViewDetails(purchase) {
     setSelectedPurchase(purchase);
     setDetailsModalOpen(true);
+  }
+
+  // Handle Edit Purchase
+  function handleEditPurchase(purchase) {
+    setPurchaseToEdit(purchase);
+    setEditModalOpen(true);
+  }
+
+  function handlePurchaseUpdated(updatedPurchase) {
+    setToast({
+      type: "success",
+      message: `Purchase "${updatedPurchase.purchaseNumber}" updated successfully.`,
+    });
+    reloadAfterMutation();
   }
 
   // Handle Cancel Request
@@ -180,17 +198,6 @@ export default function PurchasesPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
-            title="Refresh list"
-          >
-            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
@@ -548,6 +555,18 @@ export default function PurchasesPage() {
                           {!isCancelled && (
                             <button
                               type="button"
+                              onClick={() => handleEditPurchase(purchase)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-vendora/15 text-vendora-text hover:bg-vendora-bg transition"
+                              title="Edit Purchase"
+                              aria-label={`Edit purchase ${purchase.purchaseNumber}`}
+                            >
+                              <EditIcon className="h-4 w-4" />
+                            </button>
+                          )}
+
+                          {!isCancelled && (
+                            <button
+                              type="button"
                               onClick={() => handleRequestCancel(purchase)}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition"
                               title="Cancel Purchase & Reverse Stock"
@@ -615,6 +634,16 @@ export default function PurchasesPage() {
           onClose={() => setDetailsModalOpen(false)}
           purchase={selectedPurchase}
           onCancelRequest={(p) => handleRequestCancel(p)}
+        />
+      )}
+
+      {/* Edit Purchase Modal (lazy) */}
+      {editModalOpen && (
+        <EditPurchaseModal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          purchase={purchaseToEdit}
+          onSuccess={handlePurchaseUpdated}
         />
       )}
 

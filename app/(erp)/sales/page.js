@@ -13,7 +13,6 @@ const SaleDetailsModal = dynamic(() => import("../../../components/SaleDetailsMo
 import {
   SearchIcon,
   PlusIcon,
-  RefreshIcon,
   ReceiptIcon,
   EyeIcon,
   BanIcon,
@@ -172,17 +171,6 @@ export default function SalesPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-xl border border-vendora/20 bg-surface px-3.5 py-2.5 text-sm font-medium text-vendora-text transition hover:bg-vendora-bg focus:outline-none focus:ring-2 focus:ring-vendora disabled:opacity-50"
-            title="Refresh list"
-          >
-            <RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
