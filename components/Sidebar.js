@@ -79,7 +79,7 @@ export default function Sidebar({ open, pathname, onNavigate, user, onLogout }) 
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="font-bold tracking-tight text-white text-base">Mini ERP</span>
+            <span className="font-bold tracking-tight text-white text-base">VENDORA</span>
             <span className="rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-400">PRO</span>
           </div>
           <p className="truncate text-xs font-medium text-slate-400">
