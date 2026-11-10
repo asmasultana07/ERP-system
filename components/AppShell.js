@@ -54,6 +54,8 @@ export default function AppShell({ children }) {
         open={menuOpen}
         pathname={pathname}
         onNavigate={() => setMenuOpen(false)}
+        user={user}
+        onLogout={handleLogout}
       />
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">

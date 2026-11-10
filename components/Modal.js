@@ -33,46 +33,46 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-vendora-dark/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Modal Dialog */}
       <div
-        className={`relative w-full ${maxWidth} overflow-hidden rounded-2xl bg-surface shadow-2xl transition-all`}
+        className={`relative w-full ${maxWidth} overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl transition-all duration-200 animate-in fade-in zoom-in-95`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-vendora/10 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4.5 bg-slate-50/50 dark:bg-slate-850/50">
           <div>
             <h2
               id="modal-title"
-              className="text-lg font-semibold text-vendora-dark"
+              className="text-lg font-bold text-slate-900 dark:text-white tracking-tight"
             >
               {title}
             </h2>
             {description ? (
-              <p className="mt-0.5 text-xs text-vendora-text/70">{description}</p>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p>
             ) : null}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-vendora-text/60 transition hover:bg-vendora-bg hover:text-vendora-dark focus:outline-none focus:ring-2 focus:ring-vendora"
+            className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
             aria-label="Close dialog"
           >
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-6">{children}</div>
+        <div className="p-6 max-h-[calc(85vh-5rem)] overflow-y-auto">{children}</div>
       </div>
     </div>
   );

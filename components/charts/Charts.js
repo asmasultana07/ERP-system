@@ -1,12 +1,10 @@
 "use client";
 
 // Dependency-free, responsive, theme-aware SVG charts.
-// Follows the dataviz mark specs: thin 2px lines, 4px rounded bar ends, a 2px
-// surface gap between donut segments, recessive grid/axes, a legend for >=2
-// series, and a hover tooltip layer. All data is supplied by callers from real
-// API responses — nothing here is hardcoded.
+// Enhanced for modern SaaS visualization: subtle gridlines, dual-stop gradient fills,
+// smooth curves, rounded bar ends, glowing hover states, and frosted tooltips.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function useMeasure() {
   const ref = useRef(null);
@@ -25,26 +23,29 @@ function useMeasure() {
   return [ref, width];
 }
 
-const MUTED = "var(--color-vendora-text)";
+const MUTED = "currentColor";
 
 function Tooltip({ x, y, children }) {
   return (
     <div
-      className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-vendora/15 bg-surface px-3 py-2 text-xs shadow-lg"
-      style={{ left: x, top: y - 8 }}
+      className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-3 py-2 text-xs shadow-xl backdrop-blur-md transition-all duration-75"
+      style={{ left: x, top: y - 10 }}
     >
       {children}
     </div>
   );
 }
 
-function EmptyChart({ height, message = "No data for this period." }) {
+function EmptyChart({ height, message = "No data recorded for this period." }) {
   return (
     <div
-      className="flex items-center justify-center text-sm text-vendora-text/50"
+      className="flex flex-col items-center justify-center text-xs font-medium text-slate-400 dark:text-slate-500"
       style={{ height }}
     >
-      {message}
+      <svg viewBox="0 0 24 24" className="h-8 w-8 stroke-current stroke-1 opacity-40 mb-1" fill="none">
+        <path d="M3 3v18h18M7 16l4-4 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span>{message}</span>
     </div>
   );
 }
@@ -53,8 +54,8 @@ function EmptyChart({ height, message = "No data for this period." }) {
 
 export function AreaChart({
   data = [],
-  height = 240,
-  color = "var(--color-vendora-accent)",
+  height = 250,
+  color = "#2563eb",
   valueFormat = (v) => v,
   maxTicks = 6,
 }) {
@@ -63,16 +64,16 @@ export function AreaChart({
 
   if (!data.length) return <div ref={ref}><EmptyChart height={height} /></div>;
 
-  const padL = 48;
-  const padR = 12;
-  const padT = 12;
-  const padB = 26;
+  const padL = 52;
+  const padR = 16;
+  const padT = 16;
+  const padB = 28;
   const w = Math.max(width, 240);
   const innerW = w - padL - padR;
   const innerH = height - padT - padB;
 
   const max = Math.max(...data.map((d) => d.value), 1);
-  const niceMax = max * 1.1;
+  const niceMax = max * 1.15;
   const xAt = (i) =>
     padL + (data.length === 1 ? innerW / 2 : (i / (data.length - 1)) * innerW);
   const yAt = (v) => padT + innerH - (v / niceMax) * innerH;
@@ -97,8 +98,10 @@ export function AreaChart({
     setHover(idx);
   };
 
+  const gradientId = `areaGrad-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
+
   return (
-    <div ref={ref} className="relative w-full">
+    <div ref={ref} className="relative w-full text-slate-400 dark:text-slate-500">
       <svg
         width="100%"
         height={height}
@@ -106,14 +109,17 @@ export function AreaChart({
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
         role="img"
+        className="overflow-visible"
       >
         <defs>
-          <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+            <stop offset="60%" stopColor={color} stopOpacity="0.08" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.00" />
           </linearGradient>
         </defs>
 
+        {/* Horizontal gridlines and Y axis labels */}
         {gridVals.map((v, i) => (
           <g key={i}>
             <line
@@ -122,37 +128,42 @@ export function AreaChart({
               x2={w - padR}
               y2={yAt(v)}
               stroke={MUTED}
-              strokeOpacity="0.1"
+              strokeOpacity="0.08"
+              strokeDasharray={i === 0 ? "none" : "3 3"}
             />
-            <text x={padL - 8} y={yAt(v) + 3} textAnchor="end" fontSize="10" fill={MUTED} fillOpacity="0.55">
+            <text x={padL - 10} y={yAt(v) + 3} textAnchor="end" fontSize="10" fill={MUTED} fillOpacity="0.75" fontWeight="500">
               {valueFormat(Math.round(v))}
             </text>
           </g>
         ))}
 
-        <path d={areaPath} fill="url(#areaFill)" />
-        <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {/* Gradient fill area & line */}
+        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
 
+        {/* X axis labels */}
         {data.map((d, i) =>
           i % labelStep === 0 || i === data.length - 1 ? (
-            <text key={i} x={xAt(i)} y={height - 8} textAnchor="middle" fontSize="10" fill={MUTED} fillOpacity="0.55">
+            <text key={i} x={xAt(i)} y={height - 8} textAnchor="middle" fontSize="10" fill={MUTED} fillOpacity="0.75" fontWeight="500">
               {d.label}
             </text>
           ) : null
         )}
 
+        {/* Hover cursor and dot */}
         {hover != null && (
           <g>
-            <line x1={xAt(hover)} y1={padT} x2={xAt(hover)} y2={padT + innerH} stroke={MUTED} strokeOpacity="0.25" />
-            <circle cx={xAt(hover)} cy={yAt(data[hover].value)} r="4" fill={color} stroke="var(--color-surface)" strokeWidth="2" />
+            <line x1={xAt(hover)} y1={padT} x2={xAt(hover)} y2={padT + innerH} stroke={MUTED} strokeOpacity="0.3" strokeDasharray="2 2" />
+            <circle cx={xAt(hover)} cy={yAt(data[hover].value)} r="6" fill={color} fillOpacity="0.3" />
+            <circle cx={xAt(hover)} cy={yAt(data[hover].value)} r="3.5" fill={color} stroke="#ffffff" strokeWidth="2" />
           </g>
         )}
       </svg>
 
       {hover != null && (
         <Tooltip x={(xAt(hover) / w) * 100 + "%"} y={yAt(data[hover].value)}>
-          <p className="font-semibold text-vendora-text">{valueFormat(data[hover].value)}</p>
-          <p className="text-vendora-text/60">{data[hover].label}</p>
+          <p className="font-bold text-slate-900 dark:text-white text-sm">{valueFormat(data[hover].value)}</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{data[hover].label}</p>
         </Tooltip>
       )}
     </div>
@@ -163,8 +174,8 @@ export function AreaChart({
 
 export function BarChart({
   data = [],
-  height = 240,
-  color = "var(--color-vendora-accent)",
+  height = 250,
+  color = "#2563eb",
   valueFormat = (v) => v,
 }) {
   const [ref, width] = useMeasure();
@@ -173,17 +184,17 @@ export function BarChart({
   if (!data.length) return <div ref={ref}><EmptyChart height={height} /></div>;
 
   const padL = 48;
-  const padR = 12;
-  const padT = 12;
-  const padB = 26;
+  const padR = 16;
+  const padT = 16;
+  const padB = 28;
   const w = Math.max(width, 240);
   const innerW = w - padL - padR;
   const innerH = height - padT - padB;
 
   const max = Math.max(...data.map((d) => d.value), 1);
-  const niceMax = max * 1.1;
-  const gap = Math.min(16, innerW / data.length / 3);
-  const bw = innerW / data.length - gap;
+  const niceMax = max * 1.15;
+  const gap = Math.min(14, innerW / data.length / 3);
+  const bw = Math.max(4, innerW / data.length - gap);
   const yAt = (v) => padT + innerH - (v / niceMax) * innerH;
 
   const yTicks = 4;
@@ -191,12 +202,12 @@ export function BarChart({
   const labelStep = Math.ceil(data.length / Math.min(8, data.length));
 
   return (
-    <div ref={ref} className="relative w-full">
-      <svg width="100%" height={height} viewBox={`0 0 ${w} ${height}`} role="img">
+    <div ref={ref} className="relative w-full text-slate-400 dark:text-slate-500">
+      <svg width="100%" height={height} viewBox={`0 0 ${w} ${height}`} role="img" className="overflow-visible">
         {gridVals.map((v, i) => (
           <g key={i}>
-            <line x1={padL} y1={yAt(v)} x2={w - padR} y2={yAt(v)} stroke={MUTED} strokeOpacity="0.1" />
-            <text x={padL - 8} y={yAt(v) + 3} textAnchor="end" fontSize="10" fill={MUTED} fillOpacity="0.55">
+            <line x1={padL} y1={yAt(v)} x2={w - padR} y2={yAt(v)} stroke={MUTED} strokeOpacity="0.08" strokeDasharray={i === 0 ? "none" : "3 3"} />
+            <text x={padL - 10} y={yAt(v) + 3} textAnchor="end" fontSize="10" fill={MUTED} fillOpacity="0.75" fontWeight="500">
               {valueFormat(Math.round(v))}
             </text>
           </g>
@@ -206,9 +217,10 @@ export function BarChart({
           const x = padL + i * (bw + gap) + gap / 2;
           const y = yAt(d.value);
           const h = Math.max(padT + innerH - y, 0);
+          const isHovered = hover === i;
           return (
-            <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-              <rect x={x} y={padT} width={bw} height={innerH} fill="transparent" />
+            <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} className="cursor-pointer">
+              <rect x={x - gap / 4} y={padT} width={bw + gap / 2} height={innerH} fill="transparent" />
               <rect
                 x={x}
                 y={y}
@@ -216,10 +228,11 @@ export function BarChart({
                 height={h}
                 rx="4"
                 fill={color}
-                fillOpacity={hover == null || hover === i ? 1 : 0.4}
+                fillOpacity={hover == null ? 0.9 : isHovered ? 1 : 0.35}
+                className="transition-all duration-150"
               />
               {(i % labelStep === 0 || i === data.length - 1) && (
-                <text x={x + bw / 2} y={height - 8} textAnchor="middle" fontSize="10" fill={MUTED} fillOpacity="0.55">
+                <text x={x + bw / 2} y={height - 8} textAnchor="middle" fontSize="10" fill={MUTED} fillOpacity="0.75" fontWeight="500">
                   {d.label}
                 </text>
               )}
@@ -230,8 +243,8 @@ export function BarChart({
 
       {hover != null && (
         <Tooltip x={((padL + hover * (bw + gap) + gap / 2 + bw / 2) / w) * 100 + "%"} y={yAt(data[hover].value)}>
-          <p className="font-semibold text-vendora-text">{valueFormat(data[hover].value)}</p>
-          <p className="text-vendora-text/60">{data[hover].label}</p>
+          <p className="font-bold text-slate-900 dark:text-white text-sm">{valueFormat(data[hover].value)}</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{data[hover].label}</p>
         </Tooltip>
       )}
     </div>
@@ -241,14 +254,14 @@ export function BarChart({
 /* -------------------------------- Donut -------------------------------- */
 
 const SERIES = [
-  "var(--series-1)",
-  "var(--series-2)",
-  "var(--series-3)",
-  "var(--series-4)",
-  "var(--series-5)",
-  "var(--series-6)",
-  "var(--series-7)",
-  "var(--series-8)",
+  "#2563eb", // blue
+  "#10b981", // emerald
+  "#8b5cf6", // violet
+  "#f59e0b", // amber
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#6366f1", // indigo
+  "#f43f5e", // rose
 ];
 
 function arcPath(cx, cy, rOuter, rInner, startAngle, endAngle) {
@@ -265,7 +278,6 @@ export function DonutChart({ data = [], valueFormat = (v) => v, centerLabel = "T
   const [hover, setHover] = useState(null);
   if (!data.length) return <EmptyChart height={220} />;
 
-  // Fold anything past 7 slots into "Other" so hues are never cycled.
   let items = [...data].sort((a, b) => b.value - a.value);
   if (items.length > 8) {
     const head = items.slice(0, 7);
@@ -274,12 +286,12 @@ export function DonutChart({ data = [], valueFormat = (v) => v, centerLabel = "T
   }
 
   const total = items.reduce((s, d) => s + d.value, 0) || 1;
-  const size = 200;
+  const size = 190;
   const cx = size / 2;
   const cy = size / 2;
-  const rO = 92;
-  const rI = 58;
-  const gapAngle = 0.03;
+  const rO = 86;
+  const rI = 56;
+  const gapAngle = 0.035;
 
   let angle = -Math.PI / 2;
   const segments = items.map((d, i) => {
@@ -291,7 +303,7 @@ export function DonutChart({ data = [], valueFormat = (v) => v, centerLabel = "T
   });
 
   return (
-    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:justify-center">
+    <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-center py-2">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" className="shrink-0">
         {segments.map((s) => (
           <path
@@ -300,15 +312,16 @@ export function DonutChart({ data = [], valueFormat = (v) => v, centerLabel = "T
             fill={s.color}
             stroke="var(--color-surface)"
             strokeWidth="2"
-            opacity={hover == null || hover === s.i ? 1 : 0.4}
+            opacity={hover == null ? 1 : hover === s.i ? 1 : 0.35}
             onMouseEnter={() => setHover(s.i)}
             onMouseLeave={() => setHover(null)}
+            className="cursor-pointer transition-opacity duration-150"
           />
         ))}
-        <text x={cx} y={cy - 4} textAnchor="middle" fontSize="20" fontWeight="700" fill="var(--color-vendora-text)">
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize="18" fontWeight="800" fill="currentColor" className="text-slate-900 dark:text-white">
           {hover != null ? `${Math.round(segments[hover].frac * 100)}%` : valueFormat(total)}
         </text>
-        <text x={cx} y={cy + 16} textAnchor="middle" fontSize="11" fill={MUTED} fillOpacity="0.6">
+        <text x={cx} y={cy + 16} textAnchor="middle" fontSize="11" fill="currentColor" className="text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">
           {hover != null ? segments[hover].label : centerLabel}
         </text>
       </svg>
@@ -317,17 +330,19 @@ export function DonutChart({ data = [], valueFormat = (v) => v, centerLabel = "T
         {segments.map((s) => (
           <li
             key={s.i}
-            className="flex items-center justify-between gap-3 rounded-lg px-2 py-1 text-sm transition hover:bg-vendora-bg/50"
+            className={`flex items-center justify-between gap-3 rounded-xl px-2.5 py-1.5 text-xs transition cursor-pointer ${
+              hover === s.i ? "bg-slate-100 dark:bg-slate-800 font-semibold" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
+            }`}
             onMouseEnter={() => setHover(s.i)}
             onMouseLeave={() => setHover(null)}
           >
             <span className="flex min-w-0 items-center gap-2">
-              <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: s.color }} />
-              <span className="truncate text-vendora-text">{s.label}</span>
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
+              <span className="truncate text-slate-700 dark:text-slate-200">{s.label}</span>
             </span>
-            <span className="shrink-0 font-medium text-vendora-text/80">
+            <span className="shrink-0 font-semibold text-slate-900 dark:text-slate-100">
               {valueFormat(s.value)}{" "}
-              <span className="text-vendora-text/50">({Math.round(s.frac * 100)}%)</span>
+              <span className="text-slate-400 font-normal">({Math.round(s.frac * 100)}%)</span>
             </span>
           </li>
         ))}

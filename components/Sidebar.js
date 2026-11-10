@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-
 import Logo from "./Logo";
 import { NAV_ITEMS } from "../lib/navigation";
 
@@ -52,26 +51,47 @@ function NavIcon({ href }) {
   );
 }
 
-export default function Sidebar({ open, pathname, onNavigate }) {
+function initials(name) {
+  if (!name || typeof name !== "string") return "A";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+}
+
+export default function Sidebar({ open, pathname, onNavigate, user, onLogout }) {
+  const name = user?.name || "Admin";
+  const email = user?.email || "admin@example.com";
+  const userInitials = initials(user?.name);
+
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-vendora-dark text-white transition-transform md:static md:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-slate-900 border-r border-slate-800 text-white transition-transform duration-200 md:static md:translate-x-0 ${
         open ? "translate-x-0" : "-translate-x-full"
       }`}
     >
-      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
-        <Logo className="h-10 w-10 shrink-0" decorative />
-        <div>
-          <p className="text-sm font-semibold tracking-[0.16em]">VENDORA</p>
-          <p className="mt-1 text-xs leading-4 text-vendora-accent">
-            Smarter Stock. Better Business.
+      {/* Brand Header */}
+      <div className="flex items-center gap-3.5 border-b border-slate-800/80 px-5 py-5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800/80 p-1 shadow-inner">
+          <Logo className="h-8 w-8" decorative />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold tracking-tight text-white text-base">Mini ERP</span>
+            <span className="rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-400">PRO</span>
+          </div>
+          <p className="truncate text-xs font-medium text-slate-400">
+            Wholesale Distributor
           </p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3 py-4" aria-label="Main">
-        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">
-          Workspace
+      {/* Navigation Links */}
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3.5 py-4" aria-label="Main">
+        <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Main Menu
         </p>
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
@@ -82,27 +102,51 @@ export default function Sidebar({ open, pathname, onNavigate }) {
               href={item.href}
               onClick={onNavigate}
               aria-current={active ? "page" : undefined}
-              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+              className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-150 ${
                 active
-                  ? "bg-white/10 font-semibold text-white"
-                  : "text-white/70 hover:bg-white/5 hover:text-white"
+                  ? "bg-blue-600 font-semibold text-white shadow-md shadow-blue-600/30"
+                  : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
               }`}
             >
               <span
-                className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-vendora-accent transition-opacity ${
-                  active ? "opacity-100" : "opacity-0"
+                className={`transition-transform duration-150 group-hover:scale-105 ${
+                  active ? "text-white" : "text-slate-400 group-hover:text-white"
                 }`}
-                aria-hidden="true"
-              />
-              <NavIcon href={item.href} />
-              {item.label}
+              >
+                <NavIcon href={item.href} />
+              </span>
+              <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-white/10 px-5 py-4">
-        <p className="text-[11px] text-white/40">VENDORA ERP · v1.0</p>
+      {/* User Footer Profile & Logout */}
+      <div className="border-t border-slate-800/90 p-3.5">
+        <div className="flex items-center justify-between rounded-xl bg-slate-800/40 p-2.5 hover:bg-slate-800/70 transition">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white shadow-sm">
+              {userInitials}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-white">{name}</p>
+              <p className="truncate text-[10px] text-slate-400">{email}</p>
+            </div>
+          </div>
+          {onLogout ? (
+            <button
+              type="button"
+              onClick={onLogout}
+              title="Logout"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700/60 hover:text-red-400 transition"
+              aria-label="Logout"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
       </div>
     </aside>
   );

@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-
 import ThemeToggle from "./ThemeToggle";
 import { SearchIcon } from "./Icons";
 
 function initials(name) {
-  if (!name || typeof name !== "string") return "";
+  if (!name || typeof name !== "string") return "A";
   return name
     .trim()
     .split(/\s+/)
@@ -29,8 +28,8 @@ export default function TopBar({ title, user, menuOpen, onMenu, onLogout }) {
   const menuRef = useRef(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const name = user?.name || "Signed in";
-  const email = user?.email || "";
+  const name = user?.name || "Admin";
+  const email = user?.email || "admin@example.com";
   const letters = initials(user?.name);
 
   useEffect(() => {
@@ -55,91 +54,95 @@ export default function TopBar({ title, user, menuOpen, onMenu, onLogout }) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-vendora/10 bg-surface/95 px-4 py-2.5 backdrop-blur sm:px-6">
-      {/* Mobile menu toggle */}
-      <button
-        type="button"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-vendora/15 text-vendora md:hidden"
-        aria-label={menuOpen ? "Close menu" : "Open menu"}
-        aria-expanded={menuOpen}
-        onClick={onMenu}
-      >
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-          {menuOpen ? (
-            <path d="M6 6l12 12M18 6 6 18" />
-          ) : (
-            <path d="M4 7h16M4 12h16M4 17h16" />
-          )}
-        </svg>
-      </button>
-
-      {/* Search bar */}
-      <div className="relative flex-1 max-w-sm">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-vendora-text/40">
-          <SearchIcon className="h-4 w-4" />
-        </div>
-        <input
-          type="search"
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
-          placeholder="Search products..."
-          className="w-full rounded-xl border border-vendora/15 bg-vendora-bg/60 py-2 pl-9 pr-3 text-sm text-vendora-text outline-none transition placeholder:text-vendora-text/40 focus:border-vendora focus:bg-surface focus:ring-2 focus:ring-vendora-accent/20"
-        />
-      </div>
-
-      {/* Right side controls */}
-      <div className="ml-auto flex items-center gap-2">
-        <ThemeToggle />
-
-        {/* Bell / notification icon */}
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8 transition-colors">
+      {/* Left section: Mobile menu + Search bar */}
+      <div className="flex items-center gap-3 flex-1 max-w-md">
         <button
           type="button"
-          className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-vendora/15 text-vendora-text/70 transition hover:bg-vendora-bg hover:text-vendora"
-          aria-label="Notifications"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 md:hidden transition"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          onClick={onMenu}
         >
-          <BellIcon className="h-5 w-5" />
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            {menuOpen ? (
+              <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+            ) : (
+              <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+            )}
+          </svg>
         </button>
 
-        {/* Avatar + dropdown */}
-        <div className="relative" ref={menuRef}>
+        {/* Global Search Input */}
+        <div className="relative w-full">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+            <SearchIcon className="h-4 w-4" />
+          </div>
+          <input
+            type="search"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder="Search products, orders, customers..."
+            className="w-full rounded-xl border border-slate-200/90 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/60 py-2 pl-9 pr-3.5 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20"
+          />
+        </div>
+      </div>
+
+      {/* Right section: Theme toggle + Notifications + Profile Avatar */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <ThemeToggle className="h-9 w-9 rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300" />
+
+        {/* Notification Bell */}
+        <button
+          type="button"
+          className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 transition"
+          aria-label="Notifications"
+          title="Notifications"
+        >
+          <BellIcon className="h-4 w-4" />
+          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white dark:ring-slate-900" />
+        </button>
+
+        {/* Profile Dropdown */}
+        <div className="relative ml-1" ref={menuRef}>
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-vendora text-sm font-semibold text-white ring-vendora-accent transition hover:bg-vendora-dark focus:outline-none focus:ring-2 focus:ring-offset-2"
-            aria-label="Open profile"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-sm ring-2 ring-blue-500/30 hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            aria-label="Open user profile"
             aria-haspopup="menu"
             aria-expanded={profileOpen}
             onClick={() => setProfileOpen((open) => !open)}
           >
-            {letters || (
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                <circle cx="12" cy="8" r="3" />
-                <path d="M5 19c1.2-3 3.6-4.5 7-4.5S17.8 16 19 19" />
-              </svg>
-            )}
+            {letters}
           </button>
 
           {profileOpen ? (
             <div
               role="menu"
-              className="absolute right-0 z-30 mt-2 w-60 rounded-2xl border border-vendora/10 bg-surface p-3 shadow-lg"
+              className="absolute right-0 z-50 mt-2.5 w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 shadow-xl shadow-slate-900/10 transition"
             >
-              <div className="flex items-center gap-3 px-1">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-vendora-bg text-sm font-semibold text-vendora">
-                  {letters || "?"}
+              <div className="flex items-center gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shadow-xs">
+                  {letters}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-vendora-text">{name}</p>
-                  {email ? <p className="truncate text-xs text-vendora-text/70">{email}</p> : null}
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{name}</p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">{email}</p>
                 </div>
               </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={onLogout}
-                className="mt-3 w-full rounded-xl bg-vendora px-3 py-2 text-sm font-medium text-white transition hover:bg-vendora-dark"
-              >
-                Logout
-              </button>
+              <div className="mt-2 border-t border-slate-100 dark:border-slate-800 pt-1">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={onLogout}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                  </svg>
+                  <span>Sign out</span>
+                </button>
+              </div>
             </div>
           ) : null}
         </div>
